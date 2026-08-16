@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FOCUS Release Notes Generator</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand">
+        <div class="brand-mark">FN</div>
+        <div>
+          <h1>FOCUS Release Notes Generator</h1>
+          <p class="subtitle">Generate Odessa release notes docx files, straight from your browser.</p>
+        </div>
+      </div>
+      <div class="template-status" id="templateStatus">
+        <span class="dot dot-ok"></span>
+        <span>Using bundled template</span>
+        <button type="button" id="uploadTemplateBtn" class="link-btn">Use a different template</button>
+        <input type="file" id="templateFile" accept=".docx" hidden />
+      </div>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- Sites -->
+    <section class="card">
+      <h2>1. Sites for this release</h2>
+      <p class="hint">Pick every site this code drop touches. A separate docx is generated per site — tickets tagged for a combo (e.g. Core/PP) will appear in both files automatically.</p>
+      <div class="chip-group" id="siteChips">
+        <label class="chip"><input type="checkbox" name="site" value="Core" checked><span>Core</span></label>
+        <label class="chip"><input type="checkbox" name="site" value="Partner Portal"><span>Partner Portal</span></label>
+        <label class="chip"><input type="checkbox" name="site" value="Customer Portal"><span>Customer Portal</span></label>
+      </div>
+    </section>
+
+    <!-- Release details -->
+    <section class="card">
+      <h2>2. Release details</h2>
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="cdVersion">Release / CodeDrop version</label>
+          <input type="text" id="cdVersion" placeholder="e.g. 118.7.31.2" required />
+          <span class="field-hint">Used for cover title, CodeDrop line & revision history</span>
+        </div>
+        <div class="field">
+          <label for="productVersion">Product version</label>
+          <input type="text" id="productVersion" placeholder="e.g. 5.81.2.7421" required />
+        </div>
+        <div class="field">
+          <label for="fxVersion">Framework (FX) version</label>
+          <input type="text" id="fxVersion" placeholder="e.g. 4.24.12.49" required />
+        </div>
+        <div class="field">
+          <label for="releaseDate">Release date</label>
+          <input type="date" id="releaseDate" required />
+        </div>
+        <div class="field">
+          <label for="releaseType">Type of release</label>
+          <select id="releaseType">
+            <option value="Full Release">Full Release</option>
+            <option value="Patch Release">Patch Release</option>
+            <option value="Database Release">Database Release</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="hotfix">Hotfix release?</label>
+          <select id="hotfix">
+            <option value="No">No (goes through UAT)</option>
+            <option value="Yes">Yes (goes through Staging)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Business Configuration -->
+    <section class="card" data-section="bizconfig">
+      <div class="section-head">
+        <h2>3. Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
+        <button type="button" class="btn btn-add" data-add="bizconfig">+ Add ticket</button>
+      </div>
+      <p class="hint">Leave empty and this section will automatically read <strong>"No RBS Impact"</strong>.</p>
+      <div class="rows" id="bizconfig-rows"></div>
+      <template id="row-tpl-bizconfig">
+        <div class="ticket-row">
+          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="grid grid-ticket-4">
+            <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-166" /></div>
+            <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" placeholder="Phase2 | M2.1 | RBS changes" /></div>
+            <div class="field"><label>Type</label><input type="text" data-field="type" placeholder="RBS / EBC / Portfolio Config" /></div>
+            <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- Requirements -->
+    <section class="card" data-section="req">
+      <div class="section-head">
+        <h2>4. Requirements</h2>
+        <button type="button" class="btn btn-add" data-add="req">+ Add ticket</button>
+      </div>
+      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <div class="rows" id="req-rows"></div>
+      <template id="row-tpl-req">
+        <div class="ticket-row">
+          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="grid grid-ticket-5">
+            <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-35" /></div>
+            <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
+            <div class="field"><label>Priority</label>
+              <select data-field="priority"><option>Highest</option><option selected>Medium</option><option>Low</option><option>Lowest</option></select>
+            </div>
+            <div class="field"><label>Datafix</label>
+              <select data-field="datafix"><option selected>No</option><option>Yes</option></select>
+            </div>
+            <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- Migration & E2E -->
+    <section class="card">
+      <h2>5. Migration &amp; E2E Scenarios</h2>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="migrationText">Migration</label>
+          <textarea id="migrationText" placeholder="NA"></textarea>
+        </div>
+        <div class="field">
+          <label for="e2eText">E2E Scenarios</label>
+          <textarea id="e2eText" placeholder="NA"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tasks Completed -->
+    <section class="card" data-section="tasks">
+      <div class="section-head">
+        <h2>6. Tasks Completed</h2>
+        <button type="button" class="btn btn-add" data-add="tasks">+ Add ticket</button>
+      </div>
+      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <div class="rows" id="tasks-rows"></div>
+      <template id="row-tpl-tasks">
+        <div class="ticket-row">
+          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="grid grid-ticket-5">
+            <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-145" /></div>
+            <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
+            <div class="field"><label>Priority</label>
+              <select data-field="priority"><option>Highest</option><option selected>Medium</option><option>Low</option><option>Lowest</option></select>
+            </div>
+            <div class="field"><label>Datafix</label>
+              <select data-field="datafix"><option selected>No</option><option>Yes</option></select>
+            </div>
+            <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- Code Drop Defects -->
+    <section class="card" data-section="cdd">
+      <div class="section-head">
+        <h2>7. Code Drop Defects</h2>
+        <button type="button" class="btn btn-add" data-add="cdd">+ Add ticket</button>
+      </div>
+      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <div class="rows" id="cdd-rows"></div>
+      <template id="row-tpl-cdd">
+        <div class="ticket-row">
+          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="grid grid-ticket-5">
+            <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC03-2215" /></div>
+            <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
+            <div class="field"><label>Priority</label>
+              <select data-field="priority"><option selected>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
+            </div>
+            <div class="field"><label>Datafix</label>
+              <select data-field="datafix"><option>No</option><option selected>Yes</option></select>
+            </div>
+            <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- Technical Configuration -->
+    <section class="card">
+      <h2>8. Technical Configuration</h2>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="appSettingsText">AppSettings.Config change(s)</label>
+          <textarea id="appSettingsText" placeholder="NA"></textarea>
+        </div>
+        <div class="field">
+          <label for="webConfigText">Web Config change(s)</label>
+          <textarea id="webConfigText" placeholder="NA"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- Release Request Packages -->
+    <section class="card">
+      <h2>9. Release Request Packages</h2>
+      <div class="grid grid-3 rrp-grid" id="rrpGrid">
+        <!-- filled by JS -->
+      </div>
+    </section>
+
+    <!-- Generate -->
+    <section class="card generate-card">
+      <button type="button" id="generateBtn" class="btn btn-primary">Generate release notes</button>
+      <div id="statusMsg" class="status-msg"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>Runs entirely in your browser — nothing is uploaded anywhere.</p>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
