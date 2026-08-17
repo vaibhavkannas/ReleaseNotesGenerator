@@ -558,31 +558,6 @@ function buildChatMessageText(site) {
   else if (noPkgs.length === 0) lines.push(`Packages - all Yes`);
   else lines.push(`Packages - ${yesPkgs.join(", ")} are yes, rest no`);
 
-  lines.push("");
-
-  const sections = {
-    bizconfig: collectRows("bizconfig"),
-    req: collectRows("req"),
-    tasks: collectRows("tasks"),
-    cdd: collectRows("cdd"),
-  };
-  Object.keys(SECTION_CONFIG).forEach(sec => {
-    const rows = sections[sec].filter(r => r.sites.includes(site));
-    lines.push(`${SECTION_LABELS[sec]}:`);
-    if (rows.length === 0) {
-      lines.push(sec === "bizconfig" ? "  No RBS Impact" : "  NA");
-    } else {
-      rows.forEach(r => {
-        if (sec === "bizconfig") {
-          lines.push(`  - ${r.data.key} : ${r.data.summary} (${r.data.type || "—"})`);
-        } else {
-          lines.push(`  - ${r.data.key} : ${r.data.summary} (${r.data.priority}, Datafix: ${r.data.datafix})`);
-        }
-      });
-    }
-    lines.push("");
-  });
-
   return lines.join("\n").trim();
 }
 
