@@ -171,15 +171,12 @@ function onInsertExampleRows() {
 
 async function onCopyGrid() {
   const statusEl = document.getElementById("copyTicketTemplateStatus");
-  if (!gridHasContent()) {
-    statusEl.className = "status-msg error";
-    statusEl.textContent = "Grid is empty — nothing to copy.";
-    return;
-  }
   try {
     await navigator.clipboard.writeText(getGridText());
     statusEl.className = "status-msg ok";
-    statusEl.textContent = "Grid copied — paste it into Excel, Sheets, or anywhere else that takes tab-separated text.";
+    statusEl.textContent = gridHasContent()
+      ? "Grid copied — paste it into Excel, Sheets, or anywhere else that takes tab-separated text."
+      : "Header row copied (grid is empty otherwise) — paste it into Excel or Sheets to get the columns set up.";
   } catch (e) {
     statusEl.className = "status-msg error";
     statusEl.textContent = "Couldn't copy — your browser may be blocking clipboard access.";
