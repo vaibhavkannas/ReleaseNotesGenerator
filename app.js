@@ -463,6 +463,16 @@ function buildSiteDetailCards() {
       statusEl.textContent = filled > 0 ? `Filled ${filled} field(s) — please review.` : "Couldn't recognize any fields — fill in manually.";
     });
 
+    // Clicking into an empty box drops in real, editable template text (not
+    // just inert placeholder ghost text) so the user can edit the actual
+    // values in place rather than typing the whole block from scratch.
+    const pasteDetailsTextarea = card.querySelector("[data-paste-details]");
+    pasteDetailsTextarea.addEventListener("focus", () => {
+      if (pasteDetailsTextarea.value.trim() !== "") return;
+      pasteDetailsTextarea.value = pasteDetailsTextarea.placeholder.replace(/\r/g, "");
+      pasteDetailsTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
     card.querySelector("[data-generate-chat]").addEventListener("click", () => {
       const text = buildChatMessageText(site);
       card.querySelector("[data-chat-output-wrap]").classList.remove("hidden");
