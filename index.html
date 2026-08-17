@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=5" />
+<link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
 <div class="app">
@@ -72,13 +72,15 @@
         <em>Issue Type, Issue key, Summary, Priority, Type, Core/PP/CP</em> are recognized automatically —
         if your sheet includes its own header row, it's fine to paste that too, it'll be ignored.
         Tickets are routed to the right section automatically: Bugs → Code Drop Defects, Requirements → Requirements,
-        RBS/EBC/Portfolio/User Config → Business Configuration, everything else → Tasks Completed.
+        RBS/EBC/Portfolio/User Config → Business Configuration, everything else → Tasks Completed. Within any section
+        that has a Priority field, tickets are always kept ordered Critical → Highest → High → Medium → Low.
       </p>
       <div class="paste-zone">
         <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows</div>
         <div class="paste-actions" style="margin-top:0; margin-bottom:10px;">
           <button type="button" id="copyTicketTemplateBtn" class="btn btn-secondary btn-sm">📋 Insert example rows</button>
           <button type="button" id="addGridRowBtn" class="btn btn-secondary btn-sm">+ Add row</button>
+          <button type="button" id="copyGridBtn" class="btn btn-secondary btn-sm">📤 Copy grid</button>
           <button type="button" id="clearGridBtn" class="btn btn-secondary btn-sm btn-danger-outline">🧹 Clear grid</button>
           <span id="copyTicketTemplateStatus" class="status-msg"></span>
         </div>
@@ -154,7 +156,7 @@
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-35" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Critical</option><option>Highest</option><option>High</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
               <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
@@ -198,7 +200,7 @@
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-145" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Critical</option><option>Highest</option><option>High</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
               <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
@@ -227,7 +229,7 @@
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC03-2215" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Critical</option><option>Highest</option><option>High</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
               <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
@@ -332,7 +334,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="parsers.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

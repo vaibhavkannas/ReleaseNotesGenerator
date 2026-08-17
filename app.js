@@ -25,6 +25,15 @@ const SECTION_CONFIG = {
   cdd:       { rowFields: ["key", "summary", "priority", "datafix"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY", datafix: "ROW_DATAFIX" } },
 };
 
+// Rule: within any section that has a Priority field, tickets must always be
+// ordered Critical > Highest > High > Medium > Low (Lowest sinks below Low;
+// anything unrecognized or blank sinks to the very end).
+const PRIORITY_RANK = { critical: 0, highest: 1, high: 2, medium: 3, low: 4, lowest: 5 };
+function priorityRank(value) {
+  const key = (value || "").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(PRIORITY_RANK, key) ? PRIORITY_RANK[key] : 99;
+}
+
 const SECTION_LABELS = {
   bizconfig: "Business Configuration",
   req: "Requirements",
@@ -160,6 +169,23 @@ function onInsertExampleRows() {
   scheduleFormChangeHandlers();
 }
 
+async function onCopyGrid() {
+  const statusEl = document.getElementById("copyTicketTemplateStatus");
+  if (!gridHasContent()) {
+    statusEl.className = "status-msg error";
+    statusEl.textContent = "Grid is empty — nothing to copy.";
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(getGridText());
+    statusEl.className = "status-msg ok";
+    statusEl.textContent = "Grid copied — paste it into Excel, Sheets, or anywhere else that takes tab-separated text.";
+  } catch (e) {
+    statusEl.className = "status-msg error";
+    statusEl.textContent = "Couldn't copy — your browser may be blocking clipboard access.";
+  }
+}
+
 function getGridRowsData() {
   const body = document.getElementById("pasteGridBody");
   return Array.from(body.children).map(tr =>
@@ -273,6 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("parseBtn").addEventListener("click", onParseTickets);
   document.getElementById("copyTicketTemplateBtn").addEventListener("click", onInsertExampleRows);
+  document.getElementById("copyGridBtn").addEventListener("click", onCopyGrid);
   document.getElementById("addGridRowBtn").addEventListener("click", () => addGridRow(true));
   document.getElementById("clearGridBtn").addEventListener("click", onClearGrid);
   document.getElementById("pasteGridBody").addEventListener("paste", handleGridPaste);
@@ -303,9 +330,30 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let formChangeTimer = null;
+function sortSectionByPriority(sectionKey) {
+  const cfg = SECTION_CONFIG[sectionKey];
+  if (!cfg.rowFields.includes("priority")) return; // Business Configuration has no Priority field
+  const container = document.getElementById(`${sectionKey}-rows`);
+  if (!container) return;
+  const rows = Array.from(container.children);
+  const sorted = rows.slice().sort((a, b) => {
+    const pa = priorityRank(a.querySelector('[data-field="priority"]')?.value);
+    const pb = priorityRank(b.querySelector('[data-field="priority"]')?.value);
+    return pa - pb; // stable: equal-priority rows keep their existing relative order
+  });
+  const changed = sorted.some((el, i) => el !== rows[i]);
+  if (!changed) return; // avoid pointless DOM churn when already in order
+  sorted.forEach(el => container.appendChild(el));
+}
+
+function sortAllSectionsByPriority() {
+  Object.keys(SECTION_CONFIG).forEach(sortSectionByPriority);
+}
+
 function scheduleFormChangeHandlers() {
   clearTimeout(formChangeTimer);
   formChangeTimer = setTimeout(() => {
+    sortAllSectionsByPriority();
     renderSummary();
     validateForm();
     autosaveDraft();
@@ -633,6 +681,7 @@ function moveTicketRow(rowEl, fromKey, toKey) {
   }
   rowEl.remove();
   addRowWithData(toKey, record, false);
+  sortAllSectionsByPriority();
   renderSummary();
   validateForm();
   autosaveDraft();
@@ -744,6 +793,7 @@ function onParseTickets() {
   if (skipped.length) msg += ` Skipped ${skipped.length} duplicate(s) already present: ${skipped.join(", ")}.`;
   statusEl.className = "status-msg ok";
   statusEl.textContent = msg;
+  sortAllSectionsByPriority();
   validateForm();
 }
 
@@ -1249,6 +1299,7 @@ function restoreFormState(state) {
   if (state.pasteGridRows) setGridRowsData(state.pasteGridRows);
   else initGrid();
 
+  sortAllSectionsByPriority();
   renderSummary();
   validateForm();
 }
