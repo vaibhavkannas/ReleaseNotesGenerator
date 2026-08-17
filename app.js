@@ -48,10 +48,10 @@ const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Rele
 const GRID_MIN_ROWS = 4;
 
 const EXAMPLE_TICKET_ROWS = [
-  ["", "TIC04-166", "Phase2 | M2.1 | RBS changes", "Medium", "Business Configuration", "RBS", "", "Core"],
-  ["", "TIC04-35", "Contract Booking | Additional Details in Lease Assets", "Medium", "Requirements", "", "Yes", "Core"],
-  ["", "TIC04-145", "Data Fix for TIC04-35", "Medium", "Tasks Completed", "", "Yes", "Core"],
-  ["", "TIC03-2215", "Malformed Statement Invoice file for Billtrust", "Highest", "Code Drop Defects", "", "Yes", "Core, PP"],
+  ["Task", "TIC04-1", "RBS changes", "Critical", "Business Configuration", "RBS", "", "Core"],
+  ["Requirement", "TIC04-2", "Contract Booking Enhancement", "Highest", "Requirements", "CR/Requirement", "", "Core"],
+  ["Task", "TIC04-3", "Data Fix for application # 100", "High", "Tasks Completed", "Datafix", "Yes", "Core, PP"],
+  ["Defect", "TIC03-1", "Malformed Statement Invoice file", "Medium", "Code Drop Defects", "Bug", "", "Core"],
 ];
 
 let uploadedTemplateBuffer = null;
