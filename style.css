@@ -188,6 +188,18 @@ body {
   color: var(--text);
 }
 
+/* Ticket-row fields sit side by side in a grid, and the " ✓ auto-filled"
+   suffix (see .field.auto-filled label::after below) wraps to a second
+   line in narrower columns (Issue Key / Priority / Datafix) but not in
+   the wider Summary column. Without a reserved height, that means each
+   field's input starts at a different vertical position depending on
+   whether its own label happened to wrap -- reserve two lines' worth
+   of height so every field's input lines up regardless. */
+.grid-ticket-4 .field label,
+.grid-ticket-5 .field label {
+  min-height: 2.4em;
+}
+
 .field input[type="text"],
 .field input[type="date"],
 .field select,

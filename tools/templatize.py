@@ -120,7 +120,12 @@ new_req_table = req_prefix + req_header + templated_req_row + '</w:tbl>'
 # Synthesize the intro bullet sentence to match the Tasks Completed / CDD style,
 # since Requirements has no such sentence in the source doc.
 req_bullet_para = '<w:p w14:paraId="62FB2610" w14:textId="0F9C7610" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:pPr><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">Below requirements were released as part of CD {{CD_VERSION}} - </w:t></w:r></w:p>'
-table_block = '<!--BLOCK:REQ:TABLE_START-->' + req_bullet_para + new_req_table + '<!--BLOCK:REQ:TABLE_END-->'
+# Matches the empty spacer paragraph that CDD/Tasks Completed retain naturally
+# from the source doc between their intro sentence and their table -- without
+# it, Requirements' table sits flush against the sentence while every other
+# section has a visible gap.
+req_spacer_para = '<w:p w14:paraId="62FB2611" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRPr="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"/>'
+table_block = '<!--BLOCK:REQ:TABLE_START-->' + req_bullet_para + req_spacer_para + new_req_table + '<!--BLOCK:REQ:TABLE_END-->'
 
 req_na_para = '<w:p w14:paraId="146E8121" w14:textId="77777777" w:rsidR="00AD2C1D" w:rsidRDefault="00BE259B"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t></w:r></w:p>'
 na_block = '<!--BLOCK:REQ:NA_START-->' + req_na_para + '<!--BLOCK:REQ:NA_END-->'
