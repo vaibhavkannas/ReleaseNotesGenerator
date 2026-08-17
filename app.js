@@ -947,7 +947,8 @@ async function onGenerate() {
 
     for (const site of sites) {
       const blob = await buildDocxForSite(templateBuffer, site, sections, siteValuesMap[site], globalValues);
-      const filename = `FOCUS Code Drop ${siteValuesMap[site].cdVersionRaw} Release Notes ${site}.docx`;
+      const cdVersion = splitVersion(siteValuesMap[site].cdVersionRaw).cd;
+      const filename = `FOCUS Code Drop ${cdVersion} Release Notes ${site}.docx`;
       files.push({ site, filename, blob });
     }
 
