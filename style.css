@@ -171,6 +171,13 @@ body {
   .grid-2, .grid-3, .grid-ticket-4, .grid-ticket-5 {
     grid-template-columns: 1fr;
   }
+  .ticket-row {
+    padding: 46px 14px 14px;
+  }
+  .row-actions {
+    top: 10px;
+    right: 10px;
+  }
 }
 
 .field label {
@@ -193,6 +200,11 @@ body {
   font-family: inherit;
   background: #fbfcfe;
   color: var(--text);
+}
+
+.field select:invalid,
+.field select:has(option[value=""]:checked) {
+  color: var(--text-muted);
 }
 
 .field textarea {
@@ -243,16 +255,33 @@ body {
   position: relative;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px 40px 14px 14px;
+  padding: 14px 150px 14px 14px;
   background: #fbfcfe;
 }
 
-.row-remove {
+.row-actions {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.move-select {
+  font-size: 11.5px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--text-muted);
+  max-width: 110px;
+}
+
+.row-remove {
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -328,27 +357,365 @@ body {
 .status-msg.error { color: var(--danger); }
 .status-msg.ok { color: var(--ok); }
 
-.rrp-grid .field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #fbfcfe;
-}
-.rrp-grid .field label {
-  margin: 0;
-  font-weight: 600;
-}
-.rrp-grid .field select {
-  width: auto;
-  padding: 6px 8px;
-}
-
 .app-footer {
   text-align: center;
   color: var(--text-muted);
   font-size: 12px;
   padding: 20px 0 40px;
+}
+
+/* --- Paste-first workflow additions --- */
+
+.paste-area {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  background: #fbfcfe;
+  color: var(--text);
+  resize: vertical;
+}
+.paste-area:focus {
+  outline: none;
+  border-color: var(--accent);
+  border-style: solid;
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.paste-area-small {
+  min-height: 90px;
+  font-size: 12px;
+}
+
+.paste-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--accent-dark);
+  border: 1.5px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--accent); }
+
+.btn-sm {
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+.btn-large {
+  font-size: 15px;
+  padding: 13px 28px;
+}
+
+.site-detail-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  background: #fbfcfe;
+}
+.site-detail-card.hidden { display: none; }
+.site-detail-card h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--accent-dark);
+}
+.site-detail-card .grid { margin-top: 14px; }
+
+.rrp-grid {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rrp-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 8px 7px 14px;
+  background: white;
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.rrp-toggle-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #d8dde5;
+  border-radius: 20px;
+  transition: background 0.15s;
+}
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.switch input:checked + .switch-slider {
+  background: var(--accent);
+}
+.switch input:checked + .switch-slider::before {
+  transform: translateX(16px);
+}
+.switch input:focus-visible + .switch-slider {
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* --- Visual language: paste zones vs. auto-filled vs. manual fields --- */
+
+.paste-zone {
+  position: relative;
+  border: 2px dashed #d4a017;
+  background: #fffbeb;
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  margin-bottom: 4px;
+}
+
+.paste-zone-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #8a6100;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+.paste-zone-label .pin {
+  background: #d4a017;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.paste-zone .paste-area {
+  border: 1.5px solid #e8cd7a;
+  background: #fffef9;
+}
+.paste-zone .paste-area:focus {
+  border-color: #d4a017;
+  box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.18);
+}
+
+.derived-fields-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 14px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field.auto-filled input,
+.field.auto-filled select {
+  border-color: #2e9e5b;
+  background: #f0faf3;
+  box-shadow: inset 3px 0 0 #2e9e5b;
+}
+.field.auto-filled label::after {
+  content: " ✓ auto-filled";
+  font-weight: 500;
+  font-size: 10.5px;
+  color: #2e9e5b;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rrp-toggle.auto-filled {
+  border-color: #2e9e5b;
+  background: #f0faf3;
+}
+.rrp-toggle.auto-filled .rrp-toggle-label::after {
+  content: " ✓";
+  color: #2e9e5b;
+  font-weight: 700;
+}
+
+.ticket-row.auto-filled-row {
+  border-left: 3px solid #2e9e5b;
+}
+
+/* --- Draft banner --- */
+
+.draft-banner {
+  max-width: 980px;
+  margin: 14px auto 0;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.draft-banner.hidden { display: none; }
+.draft-banner {
+  background: #eaf3fb;
+  border: 1px solid #b9d9f0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
+  color: var(--text);
+}
+.draft-banner .btn { margin-left: 4px; }
+
+/* --- Toolbar --- */
+
+.toolbar-card {
+  padding: 14px 20px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.toolbar-hint {
+  margin: 0;
+}
+
+/* --- Summary panel --- */
+
+.summary-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.summary-site {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fbfcfe;
+}
+.summary-site-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--accent-dark);
+}
+.summary-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.summary-counts {
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+.summary-empty-note {
+  color: #8a6100;
+  font-style: italic;
+}
+
+/* --- Generic hidden utility --- */
+.hidden { display: none !important; }
+
+/* --- Row warnings --- */
+.ticket-row.row-warning {
+  border-color: #d4a017;
+  background: #fffdf5;
+}
+.row-warning-msg {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: #8a6100;
+  font-weight: 600;
+}
+
+.field-error {
+  border-color: var(--danger) !important;
+  background: #fdecea !important;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15) !important;
+}
+
+/* --- Button variants --- */
+.btn-danger-outline {
+  color: #b23b2e;
+  border-color: #f0c9c2;
+}
+.btn-danger-outline:hover {
+  background: #fdecea;
+  border-color: #e0a99f;
+}
+
+/* --- Chat message block --- */
+.chat-message-block {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.chat-message-output {
+  margin-top: 10px;
+}
+.chat-message-output textarea {
+  background: #f7f9fb;
+}
+
+/* --- Generated files panel --- */
+.generated-files-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.generated-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #f0faf3;
+  border-color: #bfe3cc;
+}
+.generated-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

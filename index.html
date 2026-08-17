@@ -15,24 +15,40 @@
         <div class="brand-mark">FN</div>
         <div>
           <h1>FOCUS Release Notes Generator</h1>
-          <p class="subtitle">Generate Odessa release notes docx files, straight from your browser.</p>
+          <p class="subtitle">Paste what you already have — get release notes docx files back.</p>
         </div>
       </div>
-      <div class="template-status" id="templateStatus">
-        <span class="dot dot-ok"></span>
-        <span>Using bundled template</span>
+      <div class="template-status">
+        <span id="templateStatus"><span class="dot dot-ok"></span><span>Using bundled template</span></span>
         <button type="button" id="uploadTemplateBtn" class="link-btn">Use a different template</button>
+        <button type="button" id="forgetTemplateBtn" class="link-btn hidden">Use bundled template</button>
         <input type="file" id="templateFile" accept=".docx" hidden />
       </div>
     </div>
   </header>
 
+  <div id="draftBanner" class="draft-banner hidden">
+    <span>We found an autosaved draft from your last session.</span>
+    <button type="button" class="btn btn-sm btn-primary" data-restore>Restore</button>
+    <button type="button" class="btn btn-sm btn-secondary" data-discard>Discard</button>
+  </div>
+
   <main class="content">
+
+    <section class="card toolbar-card">
+      <div class="toolbar">
+        <button type="button" id="saveDraftBtn" class="btn btn-secondary btn-sm">💾 Save draft</button>
+        <button type="button" id="loadDraftBtn" class="btn btn-secondary btn-sm">📂 Load draft</button>
+        <input type="file" id="loadDraftFile" accept=".json" hidden />
+        <button type="button" id="resetBtn" class="btn btn-secondary btn-sm btn-danger-outline">🔄 Start new release</button>
+        <span class="hint toolbar-hint">Your work also autosaves in this browser as you go.</span>
+      </div>
+    </section>
 
     <!-- Sites -->
     <section class="card">
       <h2>1. Sites for this release</h2>
-      <p class="hint">Pick every site this code drop touches. A separate docx is generated per site — tickets tagged for a combo (e.g. Core/PP) will appear in both files automatically.</p>
+      <p class="hint">Pick every site this code drop touches. Each site gets its own Release Details / Packages below, and its own generated docx.</p>
       <div class="chip-group" id="siteChips">
         <label class="chip"><input type="checkbox" name="site" value="Core" checked><span>Core</span></label>
         <label class="chip"><input type="checkbox" name="site" value="Partner Portal"><span>Partner Portal</span></label>
@@ -40,41 +56,34 @@
       </div>
     </section>
 
-    <!-- Release details -->
+    <!-- Release Details per site -->
     <section class="card">
-      <h2>2. Release details</h2>
-      <div class="grid grid-3">
-        <div class="field">
-          <label for="cdVersion">Release / CodeDrop version</label>
-          <input type="text" id="cdVersion" placeholder="e.g. 118.7.31.2" required />
-          <span class="field-hint">Used for cover title, CodeDrop line & revision history</span>
+      <h2>2. Release details &amp; Request Packages</h2>
+      <p class="hint">Paste the same kind of note you'd normally type out — version, product version, fx version, date, hotfix, type, packages. We'll parse it and fill the fields in; double-check before generating.</p>
+      <div id="siteDetailCards"></div>
+    </section>
+
+    <!-- Ticket paste importer -->
+    <section class="card">
+      <h2>3. Tickets — paste from Excel</h2>
+      <p class="hint">
+        Copy the rows straight from your tracking sheet (including the header row if you have one — columns like
+        <em>Issue Type, Issue key, Summary, Priority, Type, Core/PP/CP</em> are recognized automatically) and paste below.
+        Tickets are routed to the right section automatically: Bugs → Code Drop Defects, Requirements → Requirements,
+        RBS/EBC/Portfolio/User Config → Business Configuration, everything else → Tasks Completed.
+      </p>
+      <div class="paste-zone">
+        <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows or a screenshot</div>
+        <div class="paste-actions" style="margin-top:0; margin-bottom:10px;">
+          <button type="button" id="copyTicketTemplateBtn" class="btn btn-secondary btn-sm">📋 Copy a ready-made template</button>
+          <span id="copyTicketTemplateStatus" class="status-msg"></span>
         </div>
-        <div class="field">
-          <label for="productVersion">Product version</label>
-          <input type="text" id="productVersion" placeholder="e.g. 5.81.2.7421" required />
-        </div>
-        <div class="field">
-          <label for="fxVersion">Framework (FX) version</label>
-          <input type="text" id="fxVersion" placeholder="e.g. 4.24.12.49" required />
-        </div>
-        <div class="field">
-          <label for="releaseDate">Release date</label>
-          <input type="date" id="releaseDate" required />
-        </div>
-        <div class="field">
-          <label for="releaseType">Type of release</label>
-          <select id="releaseType">
-            <option value="Full Release">Full Release</option>
-            <option value="Patch Release">Patch Release</option>
-            <option value="Database Release">Database Release</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="hotfix">Hotfix release?</label>
-          <select id="hotfix">
-            <option value="No">No (goes through UAT)</option>
-            <option value="Yes">Yes (goes through Staging)</option>
-          </select>
+        <textarea id="pasteArea" class="paste-area" placeholder="Paste tab-separated rows from Excel here…"></textarea>
+        <div class="paste-actions">
+          <button type="button" id="parseBtn" class="btn btn-primary">Parse &amp; add to sections</button>
+          <button type="button" id="screenshotBtn" class="btn btn-secondary">📷 Add from screenshot</button>
+          <input type="file" id="screenshotFile" accept="image/*" hidden />
+          <span id="pasteStatus" class="status-msg"></span>
         </div>
       </div>
     </section>
@@ -82,14 +91,17 @@
     <!-- Business Configuration -->
     <section class="card" data-section="bizconfig">
       <div class="section-head">
-        <h2>3. Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
-        <button type="button" class="btn btn-add" data-add="bizconfig">+ Add ticket</button>
+        <h2>4. Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
+        <button type="button" class="btn btn-add" data-add="bizconfig">+ Add manually</button>
       </div>
-      <p class="hint">Leave empty and this section will automatically read <strong>"No RBS Impact"</strong>.</p>
+      <p class="hint">Empty → automatically reads <strong>"No RBS Impact"</strong>.</p>
       <div class="rows" id="bizconfig-rows"></div>
       <template id="row-tpl-bizconfig">
         <div class="ticket-row">
-          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="row-actions">
+            <select class="move-select" data-move><option value="">Move to…</option></select>
+            <button type="button" class="row-remove" title="Remove">&times;</button>
+          </div>
           <div class="grid grid-ticket-4">
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-166" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" placeholder="Phase2 | M2.1 | RBS changes" /></div>
@@ -103,22 +115,25 @@
     <!-- Requirements -->
     <section class="card" data-section="req">
       <div class="section-head">
-        <h2>4. Requirements</h2>
-        <button type="button" class="btn btn-add" data-add="req">+ Add ticket</button>
+        <h2>5. Requirements</h2>
+        <button type="button" class="btn btn-add" data-add="req">+ Add manually</button>
       </div>
-      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
       <div class="rows" id="req-rows"></div>
       <template id="row-tpl-req">
         <div class="ticket-row">
-          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="row-actions">
+            <select class="move-select" data-move><option value="">Move to…</option></select>
+            <button type="button" class="row-remove" title="Remove">&times;</button>
+          </div>
           <div class="grid grid-ticket-5">
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-35" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option>Highest</option><option selected>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
-              <select data-field="datafix"><option selected>No</option><option>Yes</option></select>
+              <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
@@ -128,7 +143,7 @@
 
     <!-- Migration & E2E -->
     <section class="card">
-      <h2>5. Migration &amp; E2E Scenarios</h2>
+      <h2>6. Migration &amp; E2E Scenarios</h2>
       <div class="grid grid-2">
         <div class="field">
           <label for="migrationText">Migration</label>
@@ -144,22 +159,25 @@
     <!-- Tasks Completed -->
     <section class="card" data-section="tasks">
       <div class="section-head">
-        <h2>6. Tasks Completed</h2>
-        <button type="button" class="btn btn-add" data-add="tasks">+ Add ticket</button>
+        <h2>7. Tasks Completed</h2>
+        <button type="button" class="btn btn-add" data-add="tasks">+ Add manually</button>
       </div>
-      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
       <div class="rows" id="tasks-rows"></div>
       <template id="row-tpl-tasks">
         <div class="ticket-row">
-          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="row-actions">
+            <select class="move-select" data-move><option value="">Move to…</option></select>
+            <button type="button" class="row-remove" title="Remove">&times;</button>
+          </div>
           <div class="grid grid-ticket-5">
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC04-145" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option>Highest</option><option selected>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
-              <select data-field="datafix"><option selected>No</option><option>Yes</option></select>
+              <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
@@ -170,22 +188,25 @@
     <!-- Code Drop Defects -->
     <section class="card" data-section="cdd">
       <div class="section-head">
-        <h2>7. Code Drop Defects</h2>
-        <button type="button" class="btn btn-add" data-add="cdd">+ Add ticket</button>
+        <h2>8. Code Drop Defects</h2>
+        <button type="button" class="btn btn-add" data-add="cdd">+ Add manually</button>
       </div>
-      <p class="hint">Leave empty and this section will automatically read <strong>"NA"</strong>.</p>
+      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
       <div class="rows" id="cdd-rows"></div>
       <template id="row-tpl-cdd">
         <div class="ticket-row">
-          <button type="button" class="row-remove" title="Remove">&times;</button>
+          <div class="row-actions">
+            <select class="move-select" data-move><option value="">Move to…</option></select>
+            <button type="button" class="row-remove" title="Remove">&times;</button>
+          </div>
           <div class="grid grid-ticket-5">
             <div class="field"><label>Issue Key</label><input type="text" data-field="key" placeholder="TIC03-2215" /></div>
             <div class="field field-wide"><label>Summary</label><input type="text" data-field="summary" /></div>
             <div class="field"><label>Priority</label>
-              <select data-field="priority"><option selected>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
+              <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Highest</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Datafix</label>
-              <select data-field="datafix"><option>No</option><option selected>Yes</option></select>
+              <select data-field="datafix"><option value="" selected disabled hidden>Select…</option><option>No</option><option>Yes</option></select>
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
@@ -195,7 +216,7 @@
 
     <!-- Technical Configuration -->
     <section class="card">
-      <h2>8. Technical Configuration</h2>
+      <h2>9. Technical Configuration</h2>
       <div class="grid grid-2">
         <div class="field">
           <label for="appSettingsText">AppSettings.Config change(s)</label>
@@ -208,18 +229,13 @@
       </div>
     </section>
 
-    <!-- Release Request Packages -->
-    <section class="card">
-      <h2>9. Release Request Packages</h2>
-      <div class="grid grid-3 rrp-grid" id="rrpGrid">
-        <!-- filled by JS -->
-      </div>
-    </section>
-
     <!-- Generate -->
     <section class="card generate-card">
-      <button type="button" id="generateBtn" class="btn btn-primary">Generate release notes</button>
+      <div id="summaryPanel" class="summary-panel"></div>
+      <button type="button" id="generateBtn" class="btn btn-primary btn-large">Generate release notes</button>
       <div id="statusMsg" class="status-msg"></div>
+      <div id="generatedFilesPanel" class="generated-files-panel hidden"></div>
+      <button type="button" id="downloadAllBtn" class="btn btn-secondary btn-sm hidden">Download all</button>
     </section>
 
   </main>
@@ -229,8 +245,71 @@
   </footer>
 </div>
 
+<!-- Site release-details card template -->
+<template id="site-detail-tpl">
+  <div class="site-detail-card" data-site-card>
+    <h3 data-site-title></h3>
+    <div class="field paste-zone">
+      <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Release note</div>
+      <textarea class="paste-area paste-area-small" data-paste-details placeholder="Release Version : 118.7.31.2&#10;Product Version : 5.81.2.7421&#10;Fx Version : 4.24.12.49&#10;Release date - 7 aug 2026&#10;Hotfix - No&#10;Type - Full&#10;Lessor Portal, Windows Service, Web API, Database are yes, rest no"></textarea>
+      <div class="paste-actions">
+        <button type="button" class="btn btn-secondary btn-sm" data-parse-details>Parse</button>
+        <span class="status-msg" data-parse-status></span>
+      </div>
+    </div>
+    <div class="derived-fields-label">Parsed fields — check before generating</div>
+    <div class="grid grid-3">
+      <div class="field">
+        <label>Release / CodeDrop version</label>
+        <input type="text" data-field="cdVersion" placeholder="e.g. 118.7.31.2" />
+      </div>
+      <div class="field">
+        <label>Product version</label>
+        <input type="text" data-field="productVersion" />
+      </div>
+      <div class="field">
+        <label>Framework (FX) version</label>
+        <input type="text" data-field="fxVersion" />
+      </div>
+      <div class="field">
+        <label>Release date</label>
+        <input type="date" data-field="releaseDate" />
+      </div>
+      <div class="field">
+        <label>Type of release</label>
+        <select data-field="releaseType">
+          <option value="Full Release">Full Release</option>
+          <option value="Patch Release">Patch Release</option>
+          <option value="Database Release">Database Release</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hotfix release?</label>
+        <select data-field="hotfix">
+          <option value="No">No (UAT)</option>
+          <option value="Yes">Yes (Staging)</option>
+        </select>
+      </div>
+    </div>
+    <div class="rrp-grid grid grid-3" data-rrp-grid></div>
+
+    <div class="chat-message-block">
+      <button type="button" class="btn btn-secondary btn-sm" data-generate-chat>📋 Copy as message</button>
+      <div class="chat-message-output hidden" data-chat-output-wrap>
+        <textarea class="paste-area paste-area-small" data-chat-output readonly></textarea>
+        <div class="paste-actions">
+          <button type="button" class="btn btn-secondary btn-sm" data-copy-chat>Copy to clipboard</button>
+          <span class="status-msg" data-copy-status></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<script src="parsers.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
