@@ -255,6 +255,8 @@ function decideSection(issueType, subType, targetSectionRaw) {
   return "tasks";
 }
 
+const FALLBACK_FIELD_ORDER = ["issueType", "key", "summary", "assignee", "priority", "subType", "sites"];
+
 function parseTicketPaste(text) {
   const lines = text.split(/\n/).map(l => l.replace(/\r$/, "")).filter(l => l.trim() !== "");
   if (lines.length === 0) return [];
@@ -280,8 +282,7 @@ function parseTicketPaste(text) {
       });
     } else {
       // best-effort fixed order fallback: Issue Type, Key, Summary, Assignee, Priority, Type, Sites
-      const order = ["issueType", "key", "summary", "assignee", "priority", "subType", "sites"];
-      order.forEach((field, i) => { if (cells[i] !== undefined) rec[field] = cells[i]; });
+      FALLBACK_FIELD_ORDER.forEach((field, i) => { if (cells[i] !== undefined) rec[field] = cells[i]; });
     }
     if (!rec.key && !rec.summary) return; // skip junk rows
 
@@ -303,6 +304,6 @@ function parseTicketPaste(text) {
 if (typeof module !== "undefined") {
   module.exports = {
     parseDateFlexible, parsePackagesText, parseReleaseParagraph,
-    parseTicketPaste, decideSection, parseSitesToken,
+    parseTicketPaste, decideSection, parseSitesToken, FALLBACK_FIELD_ORDER,
   };
 }

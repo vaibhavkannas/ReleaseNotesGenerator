@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=2" />
+<link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
 <div class="app">
@@ -67,26 +67,49 @@
     <section class="card">
       <h2>3. Tickets — paste from Excel</h2>
       <p class="hint">
-        Copy the rows straight from your tracking sheet (including the header row if you have one — columns like
-        <em>Issue Type, Issue key, Summary, Priority, Type, Core/PP/CP</em> are recognized automatically) and paste below.
+        Click any cell and paste your rows straight from your tracking sheet (tab-separated — copying a
+        range out of Excel or Google Sheets works as-is). The grid grows to fit what you paste. Columns like
+        <em>Issue Type, Issue key, Summary, Priority, Type, Core/PP/CP</em> are recognized automatically —
+        if your sheet includes its own header row, it's fine to paste that too, it'll be ignored.
         Tickets are routed to the right section automatically: Bugs → Code Drop Defects, Requirements → Requirements,
         RBS/EBC/Portfolio/User Config → Business Configuration, everything else → Tasks Completed.
       </p>
       <div class="paste-zone">
-        <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows or a screenshot</div>
+        <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows</div>
         <div class="paste-actions" style="margin-top:0; margin-bottom:10px;">
-          <button type="button" id="copyTicketTemplateBtn" class="btn btn-secondary btn-sm">📋 Copy a ready-made template</button>
+          <button type="button" id="copyTicketTemplateBtn" class="btn btn-secondary btn-sm">📋 Insert example rows</button>
+          <button type="button" id="addGridRowBtn" class="btn btn-secondary btn-sm">+ Add row</button>
+          <button type="button" id="clearGridBtn" class="btn btn-secondary btn-sm btn-danger-outline">🧹 Clear grid</button>
           <span id="copyTicketTemplateStatus" class="status-msg"></span>
         </div>
-        <textarea id="pasteArea" class="paste-area" placeholder="Paste tab-separated rows from Excel here…"></textarea>
+        <div class="excel-grid-scroll">
+          <table class="excel-grid" id="pasteGrid">
+            <thead>
+              <tr>
+                <th data-col="issueType">Issue Type</th>
+                <th data-col="key">Issue Key</th>
+                <th data-col="summary">Summary</th>
+                <th data-col="priority">Priority</th>
+                <th data-col="targetSection">Release Notes Section</th>
+                <th data-col="subType">Type</th>
+                <th data-col="datafix">Datafix</th>
+                <th data-col="sites">Applies To (Core/PP/CP)</th>
+                <th class="excel-grid-rowaction-col"></th>
+              </tr>
+            </thead>
+            <tbody id="pasteGridBody"></tbody>
+          </table>
+        </div>
         <div class="paste-actions">
           <button type="button" id="parseBtn" class="btn btn-primary">Parse &amp; add to sections</button>
-          <button type="button" id="screenshotBtn" class="btn btn-secondary">📷 Add from screenshot</button>
-          <input type="file" id="screenshotFile" accept="image/*" hidden />
-          <button type="button" id="clearTicketsBtn" class="btn btn-secondary btn-sm btn-danger-outline">🗑️ Clear all tickets</button>
+          <button type="button" id="clearTicketsBtn" class="btn btn-secondary btn-sm btn-danger-outline">🗑️ Clear parsed tickets</button>
           <span id="pasteStatus" class="status-msg"></span>
         </div>
       </div>
+      <p class="hint" style="margin-top:10px; margin-bottom:0;">
+        "Clear parsed tickets" empties sections 4–8 below but leaves this grid exactly as it is, so you can fix
+        something and re-parse without retyping. "Clear grid" wipes this grid but leaves sections 4–8 alone.
+      </p>
     </section>
 
     <!-- Business Configuration -->
@@ -309,8 +332,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
-<script src="parsers.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="parsers.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

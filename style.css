@@ -552,6 +552,85 @@ body {
   box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.18);
 }
 
+/* --- Excel-style editable grid (ticket paste importer) --- */
+
+.excel-grid-scroll {
+  overflow-x: auto;
+  border: 1.5px solid #e8cd7a;
+  border-radius: 8px;
+  background: #fffef9;
+}
+
+.excel-grid {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 780px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.excel-grid th {
+  background: #104861;
+  color: white;
+  font-weight: 600;
+  text-align: left;
+  padding: 7px 10px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.excel-grid-rowaction-col {
+  width: 34px;
+}
+
+.excel-grid td {
+  border: 1px solid #ecdca8;
+  padding: 0;
+}
+
+.excel-grid td[contenteditable="true"] {
+  padding: 7px 10px;
+  min-width: 90px;
+  color: var(--text);
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.excel-grid td[contenteditable="true"]:focus {
+  background: #fff8e1;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.excel-grid td[data-col="summary"] {
+  min-width: 220px;
+}
+
+.excel-grid tr:nth-child(even) td[contenteditable="true"] {
+  background: rgba(16, 72, 97, 0.03);
+}
+
+.excel-grid tr:nth-child(even) td[contenteditable="true"]:focus {
+  background: #fff8e1;
+}
+
+.excel-row-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 7px 0;
+}
+.excel-row-remove:hover { background: #fde8e8; color: var(--danger); }
+
 .derived-fields-label {
   font-size: 11.5px;
   font-weight: 700;

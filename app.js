@@ -32,13 +32,18 @@ const SECTION_LABELS = {
   cdd: "Code Drop Defects",
 };
 
-const TICKET_PASTE_TEMPLATE = [
-  "Issue Key\tSummary\tPriority\tRelease Notes Section\tType\tDatafix\tApplies To (Core/PP/CP)",
-  "TIC04-166\tPhase2 | M2.1 | RBS changes\tMedium\tBusiness Configuration\tRBS\t\tCore",
-  "TIC04-35\tContract Booking | Additional Details in Lease Assets\tMedium\tRequirements\t\tYes\tCore",
-  "TIC04-145\tData Fix for TIC04-35\tMedium\tTasks Completed\t\tYes\tCore",
-  "TIC03-2215\tMalformed Statement Invoice file for Billtrust\tHighest\tCode Drop Defects\t\tYes\tCore, PP",
-].join("\n");
+// Columns in display order; data-col attributes on <th>/<td> must match these keys,
+// and these are exactly the field names parseTicketPaste()'s header-matching understands.
+const GRID_COLUMNS = ["issueType", "key", "summary", "priority", "targetSection", "subType", "datafix", "sites"];
+const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Release Notes Section", "Type", "Datafix", "Applies To (Core/PP/CP)"];
+const GRID_MIN_ROWS = 4;
+
+const EXAMPLE_TICKET_ROWS = [
+  ["", "TIC04-166", "Phase2 | M2.1 | RBS changes", "Medium", "Business Configuration", "RBS", "", "Core"],
+  ["", "TIC04-35", "Contract Booking | Additional Details in Lease Assets", "Medium", "Requirements", "", "Yes", "Core"],
+  ["", "TIC04-145", "Data Fix for TIC04-35", "Medium", "Tasks Completed", "", "Yes", "Core"],
+  ["", "TIC03-2215", "Malformed Statement Invoice file for Billtrust", "Highest", "Code Drop Defects", "", "Yes", "Core, PP"],
+];
 
 let uploadedTemplateBuffer = null;
 
@@ -84,6 +89,164 @@ function markAutoFilled(fieldWrapperEl, inputEl) {
   inputEl.addEventListener("change", clear);
 }
 
+// ---------- Excel-style ticket grid ----------
+
+function createGridRow(values) {
+  const tr = document.createElement("tr");
+  GRID_COLUMNS.forEach((col, i) => {
+    const td = document.createElement("td");
+    td.setAttribute("contenteditable", "true");
+    td.dataset.col = col;
+    td.textContent = (values && values[i]) || "";
+    tr.appendChild(td);
+  });
+  const actionTd = document.createElement("td");
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "excel-row-remove";
+  removeBtn.title = "Remove row";
+  removeBtn.textContent = "×";
+  removeBtn.addEventListener("click", () => {
+    tr.remove();
+    scheduleFormChangeHandlers();
+  });
+  actionTd.appendChild(removeBtn);
+  tr.appendChild(actionTd);
+  return tr;
+}
+
+function addGridRow(focus = false) {
+  const body = document.getElementById("pasteGridBody");
+  const tr = createGridRow();
+  body.appendChild(tr);
+  if (focus) {
+    const firstCell = tr.querySelector("td[contenteditable]");
+    if (firstCell) firstCell.focus();
+  }
+  return tr;
+}
+
+function initGrid() {
+  const body = document.getElementById("pasteGridBody");
+  body.innerHTML = "";
+  for (let i = 0; i < GRID_MIN_ROWS; i++) addGridRow(false);
+}
+
+function gridHasContent() {
+  const body = document.getElementById("pasteGridBody");
+  return Array.from(body.querySelectorAll("td[contenteditable]")).some(td => td.textContent.trim() !== "");
+}
+
+function onClearGrid() {
+  if (!gridHasContent()) return;
+  const confirmed = confirm("This clears everything in the paste grid above (sections 4–8 below are left alone). Continue?");
+  if (!confirmed) return;
+  initGrid();
+  document.getElementById("pasteStatus").textContent = "";
+  scheduleFormChangeHandlers();
+}
+
+function onInsertExampleRows() {
+  const body = document.getElementById("pasteGridBody");
+  if (gridHasContent()) {
+    const confirmed = confirm("This replaces what's currently in the grid with example rows. Continue?");
+    if (!confirmed) return;
+  }
+  body.innerHTML = "";
+  EXAMPLE_TICKET_ROWS.forEach(row => body.appendChild(createGridRow(row)));
+  const statusEl = document.getElementById("copyTicketTemplateStatus");
+  statusEl.className = "status-msg ok";
+  statusEl.textContent = "Example rows inserted below — edit the cells directly, then hit Parse.";
+  scheduleFormChangeHandlers();
+}
+
+function getGridRowsData() {
+  const body = document.getElementById("pasteGridBody");
+  return Array.from(body.children).map(tr =>
+    GRID_COLUMNS.map(col => tr.querySelector(`td[data-col="${col}"]`).textContent.trim())
+  );
+}
+
+function getGridText() {
+  const lines = [GRID_HEADER_ROW.join("\t")];
+  getGridRowsData().forEach(cells => {
+    if (cells.every(c => c === "")) return;
+    lines.push(cells.join("\t"));
+  });
+  return lines.join("\n");
+}
+
+function setGridRowsData(rows) {
+  const body = document.getElementById("pasteGridBody");
+  body.innerHTML = "";
+  const list = (rows && rows.length) ? rows : [];
+  list.forEach(row => body.appendChild(createGridRow(row)));
+  while (body.children.length < GRID_MIN_ROWS) addGridRow(false);
+}
+
+function handleGridPaste(e) {
+  const targetCell = e.target.closest("td[contenteditable]");
+  if (!targetCell) return;
+  const clipboard = e.clipboardData || window.clipboardData;
+  if (!clipboard) return;
+  const text = clipboard.getData("text/plain");
+  if (!text) return;
+  e.preventDefault();
+
+  let lines = text.replace(/\r/g, "").split("\n");
+  while (lines.length && lines[lines.length - 1] === "") lines.pop();
+  if (lines.length === 0) return;
+
+  // Plain single-value paste into one cell — no tabs/newlines to spread across cells.
+  if (lines.length === 1 && !lines[0].includes("\t")) {
+    targetCell.textContent = lines[0];
+    scheduleFormChangeHandlers();
+    return;
+  }
+
+  // Map each pasted column to a field name rather than assuming the source
+  // data's column layout matches this grid's own column order — a raw Jira
+  // export, for instance, won't have a "Release Notes Section" column, so a
+  // purely positional paste starting from the clicked cell would silently
+  // shift every column after it. If the pasted block's own first line looks
+  // like a header, use it (same flexible matching the core parser uses,
+  // handling synonyms and any column order); otherwise fall back to the same
+  // best-effort fixed order the core parser assumes for headerless pastes.
+  const firstLineCells = splitLine(lines[0], detectDelimiter(lines[0]));
+  let fieldMap; // index -> field name
+  if (looksLikeHeader(firstLineCells)) {
+    fieldMap = mapHeaderRow(firstLineCells);
+    lines = lines.slice(1);
+  } else {
+    fieldMap = {};
+    FALLBACK_FIELD_ORDER.forEach((field, i) => { fieldMap[i] = field; });
+  }
+  if (lines.length === 0) return;
+
+  const body = document.getElementById("pasteGridBody");
+  let rows = Array.from(body.children);
+  const startRow = targetCell.closest("tr");
+  const startRowIndex = rows.indexOf(startRow);
+
+  lines.forEach((line, i) => {
+    const rowIndex = startRowIndex + i;
+    if (rowIndex >= rows.length) {
+      const newRow = addGridRow(false);
+      rows.push(newRow);
+    }
+    const targetRow = rows[rowIndex];
+    const cells = splitLine(line, "\t");
+    cells.forEach((val, colIdx) => {
+      const field = fieldMap[colIdx];
+      if (!field || !GRID_COLUMNS.includes(field)) return; // no matching grid column for this source column
+      const td = targetRow.querySelector(`td[data-col="${field}"]`);
+      if (td) td.textContent = val.trim();
+    });
+  });
+
+  scheduleFormChangeHandlers();
+}
+
 // ---------- UI bootstrap ----------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -109,44 +272,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("templateFile").addEventListener("change", onTemplateFileSelected);
 
   document.getElementById("parseBtn").addEventListener("click", onParseTickets);
-  document.getElementById("copyTicketTemplateBtn").addEventListener("click", async () => {
-    const statusEl = document.getElementById("copyTicketTemplateStatus");
-    try {
-      await navigator.clipboard.writeText(TICKET_PASTE_TEMPLATE);
-      statusEl.className = "status-msg ok";
-      statusEl.textContent = "Copied! Paste into a blank Excel sheet, fill it in, then copy your rows back here.";
-    } catch (e) {
-      statusEl.className = "status-msg error";
-      statusEl.textContent = "Couldn't copy — your browser may be blocking clipboard access.";
-    }
-  });
-  document.getElementById("screenshotBtn").addEventListener("click", () => {
-    document.getElementById("screenshotFile").click();
-  });
-  document.getElementById("screenshotFile").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) runOcrIntoTextarea(file, document.getElementById("pasteArea"), document.getElementById("pasteStatus"));
-  });
-  document.getElementById("pasteArea").addEventListener("paste", (e) => {
-    const items = e.clipboardData && e.clipboardData.items;
-    if (!items) return;
-    // Excel (and most spreadsheet apps) put BOTH a tab-separated text
-    // representation AND a bitmap image of the selection on the clipboard.
-    // Always prefer the text — it's exact, unlike OCR. Only fall back to
-    // OCR when there is truly no text representation (a real screenshot).
-    const hasText = Array.from(items).some(item => item.type === "text/plain" || item.type === "text/html");
-    if (hasText) return; // let the browser perform the normal text paste
-    for (const item of items) {
-      if (item.type && item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) {
-          e.preventDefault();
-          runOcrIntoTextarea(file, document.getElementById("pasteArea"), document.getElementById("pasteStatus"));
-        }
-        break;
-      }
-    }
-  });
+  document.getElementById("copyTicketTemplateBtn").addEventListener("click", onInsertExampleRows);
+  document.getElementById("addGridRowBtn").addEventListener("click", () => addGridRow(true));
+  document.getElementById("clearGridBtn").addEventListener("click", onClearGrid);
+  document.getElementById("pasteGridBody").addEventListener("paste", handleGridPaste);
+  initGrid();
 
   document.getElementById("generateBtn").addEventListener("click", onGenerate);
   document.getElementById("downloadAllBtn").addEventListener("click", onDownloadAll);
@@ -156,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("loadDraftBtn").addEventListener("click", () => document.getElementById("loadDraftFile").click());
   document.getElementById("loadDraftFile").addEventListener("change", onLoadDraftFile);
   document.getElementById("resetBtn").addEventListener("click", onResetAll);
-  document.getElementById("clearTicketsBtn").addEventListener("click", onClearAllTickets);
+  document.getElementById("clearTicketsBtn").addEventListener("click", onClearParsedTickets);
 
   // Live summary + validation + autosave on any change within the form
   const content = document.querySelector(".content");
@@ -488,6 +618,9 @@ function moveTicketRow(rowEl, fromKey, toKey) {
     if (input) record[f] = input.value;
   });
   record.sites = Array.from(rowEl.querySelectorAll("[data-site-tags] input:checked")).map(i => i.value);
+  if (rowEl.dataset.parsedSites) {
+    try { record.parsedSites = JSON.parse(rowEl.dataset.parsedSites); } catch (e) { /* ignore malformed */ }
+  }
   rowEl.remove();
   addRowWithData(toKey, record, false);
   renderSummary();
@@ -538,6 +671,13 @@ function addRowWithData(sectionKey, record, mark = true) {
     if (mark) markAutoFilled(input.closest(".field"), input);
   });
   if (record.sites && record.sites.length) setRowSites(rowEl, record.sites);
+  // Remember everything the source data mentioned about sites, even sites
+  // that aren't among the release's currently-selected top-level sites (those
+  // never get a checkbox rendered at all -- see refreshSiteTagsForSection --
+  // so without this the information would just silently disappear).
+  // validateForm() uses this to flag rows that mention an unselected site.
+  const fullSites = record.parsedSites !== undefined ? record.parsedSites : record.sites;
+  if (fullSites) rowEl.dataset.parsedSites = JSON.stringify(fullSites);
   if (mark) rowEl.classList.add("auto-filled-row");
   return rowEl;
 }
@@ -554,26 +694,25 @@ function collectAllExistingKeys() {
 }
 
 function onParseTickets() {
-  const textarea = document.getElementById("pasteArea");
   const statusEl = document.getElementById("pasteStatus");
-  const text = textarea.value;
-  if (!text.trim()) {
+  if (!gridHasContent()) {
     statusEl.className = "status-msg error";
-    statusEl.textContent = "Paste some rows first.";
+    statusEl.textContent = "Fill in some rows in the grid above first.";
     return;
   }
+  const text = getGridText();
   let records;
   try {
     records = parseTicketPaste(text);
   } catch (err) {
     console.error(err);
     statusEl.className = "status-msg error";
-    statusEl.textContent = "Couldn't parse that — check the format and try again.";
+    statusEl.textContent = "Couldn't parse that — check the grid contents and try again.";
     return;
   }
   if (records.length === 0) {
     statusEl.className = "status-msg error";
-    statusEl.textContent = "No recognizable ticket rows found.";
+    statusEl.textContent = "No recognizable ticket rows found in the grid.";
     return;
   }
   const existingKeys = collectAllExistingKeys();
@@ -587,7 +726,7 @@ function onParseTickets() {
       return;
     }
     if (normKey) seenInBatch.add(normKey);
-    addRowWithData(rec.section, rec);
+    const rowEl = addRowWithData(rec.section, rec);
     counts[rec.section]++;
   });
   const addedTotal = records.length - skipped.length;
@@ -595,29 +734,7 @@ function onParseTickets() {
   if (skipped.length) msg += ` Skipped ${skipped.length} duplicate(s) already present: ${skipped.join(", ")}.`;
   statusEl.className = "status-msg ok";
   statusEl.textContent = msg;
-}
-
-// ---------- OCR (screenshot -> text) ----------
-
-async function runOcrIntoTextarea(file, textarea, statusEl) {
-  statusEl.className = "status-msg";
-  statusEl.textContent = "Reading image… this can take a few seconds.";
-  try {
-    const { data } = await Tesseract.recognize(file, "eng");
-    const text = (data && data.text || "").trim();
-    if (!text) {
-      statusEl.className = "status-msg error";
-      statusEl.textContent = "Couldn't read any text from that image.";
-      return;
-    }
-    textarea.value = textarea.value ? `${textarea.value}\n${text}` : text;
-    statusEl.className = "status-msg ok";
-    statusEl.textContent = "Text extracted — please check it over (OCR on tables isn't perfect), then hit Parse.";
-  } catch (err) {
-    console.error(err);
-    statusEl.className = "status-msg error";
-    statusEl.textContent = "Couldn't read that image.";
-  }
+  validateForm();
 }
 
 // ---------- Data collection ----------
@@ -633,8 +750,9 @@ function collectRows(sectionKey) {
       data[f] = input ? input.value.trim() : "";
     });
     const sites = Array.from(rowEl.querySelectorAll("[data-site-tags] input:checked")).map(i => i.value);
+    const parsedSites = rowEl.dataset.parsedSites ? JSON.parse(rowEl.dataset.parsedSites) : sites;
     if (data.key || data.summary) {
-      rows.push({ data, sites });
+      rows.push({ data, sites, parsedSites });
     }
   });
   return rows;
@@ -937,6 +1055,8 @@ function flagRow(rowEl, message) {
 function validateForm() {
   document.querySelectorAll(".ticket-row").forEach(clearFlag);
 
+  const selectedSites = new Set(getSelectedSites());
+
   document.querySelectorAll(".ticket-row").forEach(rowEl => {
     const keyInput = rowEl.querySelector('[data-field="key"]');
     const hasContent = keyInput && keyInput.value.trim();
@@ -952,6 +1072,18 @@ function validateForm() {
     if (datafixSel && !datafixSel.value) missingSelects.push("Datafix");
     if (missingSelects.length) {
       flagRow(rowEl, `${missingSelects.join(" and ")} not selected.`);
+    }
+    // The pasted/imported data for this row may have mentioned a site that
+    // isn't one of the release's currently-selected top-level sites (section
+    // 1). Those never get a checkbox rendered at all, so the information
+    // would otherwise just silently disappear -- surface it instead.
+    if (rowEl.dataset.parsedSites) {
+      let parsedSites = [];
+      try { parsedSites = JSON.parse(rowEl.dataset.parsedSites); } catch (e) { /* ignore malformed */ }
+      const unselected = parsedSites.filter(s => !selectedSites.has(s));
+      if (unselected.length) {
+        flagRow(rowEl, `Pasted data also mentioned ${unselected.join(", ")} — not selected as a release site above, so it won't be included there.`);
+      }
     }
   });
 
@@ -979,24 +1111,22 @@ function validateForm() {
 
 // ---------- Reset ----------
 
-function onClearAllTickets() {
+function onClearParsedTickets() {
   const totalTickets = Object.keys(SECTION_CONFIG).reduce(
     (sum, sec) => sum + document.getElementById(`${sec}-rows`).children.length,
     0
   );
-  if (totalTickets === 0 && !document.getElementById("pasteArea").value.trim()) return;
+  if (totalTickets === 0) return;
 
   const confirmed = confirm(
-    `This clears all ${totalTickets} parsed ticket(s) across Business Configuration, Requirements, Tasks Completed, and Code Drop Defects, plus the paste box above. Release details, sites, and the other notes fields are left untouched. Continue?`
+    `This clears all ${totalTickets} parsed ticket(s) across Business Configuration, Requirements, Tasks Completed, and Code Drop Defects. The paste grid above is left exactly as it is, so you can re-parse after fixing something without retyping. Continue?`
   );
   if (!confirmed) return;
 
   Object.keys(SECTION_CONFIG).forEach(sec => {
     document.getElementById(`${sec}-rows`).innerHTML = "";
   });
-
-  document.getElementById("pasteArea").value = "";
-  document.getElementById("pasteStatus").textContent = "";
+  validateForm();
 }
 
 function onResetAll() {
@@ -1033,7 +1163,7 @@ function onResetAll() {
   document.getElementById("e2eText").value = "";
   document.getElementById("appSettingsText").value = "";
   document.getElementById("webConfigText").value = "";
-  document.getElementById("pasteArea").value = "";
+  initGrid();
   document.getElementById("pasteStatus").textContent = "";
   document.getElementById("statusMsg").textContent = "";
   document.getElementById("statusMsg").className = "status-msg";
@@ -1055,7 +1185,7 @@ function serializeFormState() {
     e2eText: document.getElementById("e2eText").value,
     appSettingsText: document.getElementById("appSettingsText").value,
     webConfigText: document.getElementById("webConfigText").value,
-    pasteAreaText: document.getElementById("pasteArea").value,
+    pasteGridRows: getGridRowsData(),
   };
   SITES.forEach(site => {
     const card = document.querySelector(`[data-site-card][data-site="${site}"]`);
@@ -1064,7 +1194,7 @@ function serializeFormState() {
     state.siteDetails[site] = { ...v, pasteText: card.querySelector("[data-paste-details]").value };
   });
   Object.keys(SECTION_CONFIG).forEach(sec => {
-    state.sections[sec] = collectRows(sec).map(r => ({ ...r.data, sites: r.sites }));
+    state.sections[sec] = collectRows(sec).map(r => ({ ...r.data, sites: r.sites, parsedSites: r.parsedSites }));
   });
   return state;
 }
@@ -1105,9 +1235,11 @@ function restoreFormState(state) {
   document.getElementById("e2eText").value = state.e2eText || "";
   document.getElementById("appSettingsText").value = state.appSettingsText || "";
   document.getElementById("webConfigText").value = state.webConfigText || "";
-  if (state.pasteAreaText) document.getElementById("pasteArea").value = state.pasteAreaText;
+  if (state.pasteGridRows) setGridRowsData(state.pasteGridRows);
+  else initGrid();
 
   renderSummary();
+  validateForm();
 }
 
 function onSaveDraft() {
