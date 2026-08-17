@@ -156,6 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("loadDraftBtn").addEventListener("click", () => document.getElementById("loadDraftFile").click());
   document.getElementById("loadDraftFile").addEventListener("change", onLoadDraftFile);
   document.getElementById("resetBtn").addEventListener("click", onResetAll);
+  document.getElementById("clearTicketsBtn").addEventListener("click", onClearAllTickets);
 
   // Live summary + validation + autosave on any change within the form
   const content = document.querySelector(".content");
@@ -977,6 +978,26 @@ function validateForm() {
 }
 
 // ---------- Reset ----------
+
+function onClearAllTickets() {
+  const totalTickets = Object.keys(SECTION_CONFIG).reduce(
+    (sum, sec) => sum + document.getElementById(`${sec}-rows`).children.length,
+    0
+  );
+  if (totalTickets === 0 && !document.getElementById("pasteArea").value.trim()) return;
+
+  const confirmed = confirm(
+    `This clears all ${totalTickets} parsed ticket(s) across Business Configuration, Requirements, Tasks Completed, and Code Drop Defects, plus the paste box above. Release details, sites, and the other notes fields are left untouched. Continue?`
+  );
+  if (!confirmed) return;
+
+  Object.keys(SECTION_CONFIG).forEach(sec => {
+    document.getElementById(`${sec}-rows`).innerHTML = "";
+  });
+
+  document.getElementById("pasteArea").value = "";
+  document.getElementById("pasteStatus").textContent = "";
+}
 
 function onResetAll() {
   const confirmed = confirm("This clears everything you've entered (release details, tickets, notes) and starts a fresh release. Continue?");
