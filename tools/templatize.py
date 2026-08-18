@@ -337,13 +337,25 @@ _es_idx2 = data.find('Environment Summary', _es_idx1 + 1)
 _es_tbl_start = data.find('<w:tbl>', _es_idx2)
 _es_tbl_end = data.find('</w:tbl>', _es_tbl_start) + len('</w:tbl>')
 es_table = data[_es_tbl_start:_es_tbl_end]
+# This table is (uniquely, among every table in the document) set up with
+# floating/anchored positioning (tblpPr, absolute vertical offset from its
+# anchor paragraph) rather than normal inline flow. That's fragile: any
+# upstream change that shifts pagination -- like the heading font-size
+# change earlier this round -- can make the "Environment Summary" heading
+# itself render beside the table instead of above it, since the table no
+# longer reliably tracks the heading's actual position. Converting it to a
+# plain inline table (like every other table here) makes it immune to this
+# class of bug regardless of what else changes upstream.
+_es_floating_props = '<w:tblpPr w:leftFromText="180" w:rightFromText="180" w:vertAnchor="text" w:horzAnchor="margin" w:tblpXSpec="center" w:tblpY="164"/>'
+assert es_table.count(_es_floating_props) == 1, "Environment Summary: floating tblpPr not found"
+es_table_inline = es_table.replace(_es_floating_props, '')
 FIRST_COL_DXA = round(2.2 * 1440 / 2.54)   # 2.2cm -> 1247 dxa
 OTHER_COL_DXA = round(4 * 1440 / 2.54)     # 4cm   -> 2268 dxa
-n_first = es_table.count('w:w="1408"')
-n_other = es_table.count('w:w="2551"')
+n_first = es_table_inline.count('w:w="1408"')
+n_other = es_table_inline.count('w:w="2551"')
 assert n_first == 5, f"expected 5 occurrences (1 gridCol + 4 rows) of the first column width, got {n_first}"
 assert n_other == 20, f"expected 20 occurrences (4 gridCol + 4 rows x 4 cols) of the other column width, got {n_other}"
-new_es_table = es_table.replace('w:w="1408"', f'w:w="{FIRST_COL_DXA}"').replace('w:w="2551"', f'w:w="{OTHER_COL_DXA}"')
+new_es_table = es_table_inline.replace('w:w="1408"', f'w:w="{FIRST_COL_DXA}"').replace('w:w="2551"', f'w:w="{OTHER_COL_DXA}"')
 new_total = FIRST_COL_DXA + 4 * OTHER_COL_DXA
 new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:tblW w:w="{new_total}" w:type="dxa"/>', 1)
 # Header row height (188 dxa) didn't match the 227 dxa (0.4cm) standard used
