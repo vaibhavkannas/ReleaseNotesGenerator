@@ -475,6 +475,26 @@ new_drh_table = new_drh_table.replace(drh_header, new_drh_header)
 assert data.count(drh_table) == 1
 data = data.replace(drh_table, new_drh_table)
 
+# ==== Decorative graphics: wrapThrough -> wrapNone ====
+# Two cover-page decorative elements ("Group 7" and "Picture 4" -- the logo
+# graphic and an accent shape) were set to wrapThrough/bothSides, meaning
+# body text is allowed to flow around them. These are purely cosmetic and
+# were never meant to interact with body text at all (every other decorative
+# element in the doc already uses wrapNone) -- but because wrapThrough
+# elements position relative to their anchor paragraph, any upstream content
+# change that shifts pagination (like the heading-size or row-height fixes
+# earlier this session) can cause a completely unrelated heading elsewhere in
+# the document to land in these shapes' wrap zone and render squeezed beside
+# them instead of at full width. Switching both to wrapNone removes that
+# entire class of fragility regardless of what else changes upstream.
+import re as _re
+_wrap_through_pattern = _re.compile(r'<wp:wrapThrough wrapText="bothSides">.*?</wp:wrapThrough>', _re.S)
+_wrap_matches = _wrap_through_pattern.findall(data)
+assert len(_wrap_matches) == 2, f"expected exactly 2 wrapThrough decorative elements, got {len(_wrap_matches)}"
+for _old_wrap in _wrap_matches:
+    assert data.count(_old_wrap) == 1
+    data = data.replace(_old_wrap, '<wp:wrapNone/>')
+
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
 
