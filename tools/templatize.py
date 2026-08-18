@@ -346,6 +346,12 @@ assert n_other == 20, f"expected 20 occurrences (4 gridCol + 4 rows x 4 cols) of
 new_es_table = es_table.replace('w:w="1408"', f'w:w="{FIRST_COL_DXA}"').replace('w:w="2551"', f'w:w="{OTHER_COL_DXA}"')
 new_total = FIRST_COL_DXA + 4 * OTHER_COL_DXA
 new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:tblW w:w="{new_total}" w:type="dxa"/>', 1)
+# Header row height (188 dxa) didn't match the 227 dxa (0.4cm) standard used
+# for every other table's header/single-line rows. The data rows (Staging/
+# UAT/Production) genuinely need more height to fit their wrapped 2-line
+# URLs, so only the header row is touched here.
+assert new_es_table.count('<w:trHeight w:val="188"/>') == 1, "Environment Summary: header trHeight not found"
+new_es_table = new_es_table.replace('<w:trHeight w:val="188"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
 assert data.count(es_table) == 1
 data = data.replace(es_table, new_es_table)
 
