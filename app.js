@@ -292,6 +292,25 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => toggleSectionCollapse(btn.dataset.toggle));
   });
 
+  // Clicking anywhere on a collapsible section's header (or its collapsed
+  // summary line) toggles it too -- not just the small toggle button --
+  // since a bigger click target is easier to find and use. Clicks that
+  // land on the header's own buttons (the toggle itself, "+ Add manually")
+  // are excluded so those don't fire this a second time on top of their
+  // own handlers.
+  document.querySelectorAll(".collapsible-section").forEach(section => {
+    const key = section.dataset.section;
+    const head = section.querySelector(".section-head");
+    if (head) {
+      head.addEventListener("click", (e) => {
+        if (e.target.closest(".section-head-actions")) return;
+        toggleSectionCollapse(key);
+      });
+    }
+    const summary = section.querySelector(".section-collapsed-summary");
+    if (summary) summary.addEventListener("click", () => toggleSectionCollapse(key));
+  });
+
   document.querySelectorAll('input[name="site"]').forEach(cb => {
     cb.addEventListener("change", () => {
       Object.keys(SECTION_CONFIG).forEach(refreshSiteTagsForSection);
@@ -634,23 +653,58 @@ const SECTION_EMPTY_FALLBACK = {
 // Collapse state per section follows the person's last explicit choice
 // (data-user-pref: "expanded" | "collapsed") once they've made one; before
 // that, it defaults to collapsed-when-empty / expanded-when-it-has-tickets.
+function applySectionCollapse(section, hasContent, emptyText, contentText) {
+  const summaryEl = section.querySelector(".section-collapsed-summary");
+  if (summaryEl) summaryEl.textContent = hasContent ? contentText : emptyText;
+  const pref = section.dataset.userPref;
+  const shouldCollapse = pref === "expanded" ? false : pref === "collapsed" ? true : !hasContent;
+  section.classList.toggle("collapsed", shouldCollapse);
+  const labelEl = section.querySelector(".toggle-label");
+  if (labelEl) labelEl.textContent = shouldCollapse ? "Show" : "Hide";
+}
+
 function updateSectionCollapseState(sectionKey) {
   const section = document.querySelector(`.collapsible-section[data-section="${sectionKey}"]`);
   if (!section) return;
   const count = document.getElementById(`${sectionKey}-rows`).children.length;
-  const summaryEl = section.querySelector(`[data-collapsed-summary="${sectionKey}"]`);
-  if (summaryEl) {
-    summaryEl.textContent = count > 0
-      ? `${count} ticket${count === 1 ? "" : "s"} added — click to expand/collapse.`
-      : `Empty → automatically reads "${SECTION_EMPTY_FALLBACK[sectionKey]}". Click to expand and add one manually.`;
-  }
-  const pref = section.dataset.userPref;
-  const shouldCollapse = pref === "expanded" ? false : pref === "collapsed" ? true : count === 0;
-  section.classList.toggle("collapsed", shouldCollapse);
+  applySectionCollapse(
+    section,
+    count > 0,
+    `Empty → automatically reads "${SECTION_EMPTY_FALLBACK[sectionKey]}". Click to expand and add one manually.`,
+    `${count} ticket${count === 1 ? "" : "s"} added — click to expand/collapse.`
+  );
+}
+
+// Migration/E2E and Technical Configuration aren't ticket-row sections --
+// they're just a couple of textareas each, almost always left as "NA". They
+// use the same collapse mechanics, just judged by textarea content instead
+// of a row count.
+const SIMPLE_SECTION_FIELDS = {
+  migration: ["migrationText", "e2eText"],
+  techconfig: ["appSettingsText", "webConfigText"],
+};
+
+function simpleSectionHasContent(sectionKey) {
+  return SIMPLE_SECTION_FIELDS[sectionKey].some(id => {
+    const v = (document.getElementById(id).value || "").trim();
+    return v !== "" && v.toUpperCase() !== "NA";
+  });
+}
+
+function updateSimpleSectionCollapseState(sectionKey) {
+  const section = document.querySelector(`.collapsible-section[data-section="${sectionKey}"]`);
+  if (!section) return;
+  applySectionCollapse(
+    section,
+    simpleSectionHasContent(sectionKey),
+    `Nothing filled in — usually left as "NA". Click to expand and fill in details.`,
+    `Filled in — click to expand/collapse.`
+  );
 }
 
 function updateAllSectionCollapseStates() {
   Object.keys(SECTION_CONFIG).forEach(updateSectionCollapseState);
+  Object.keys(SIMPLE_SECTION_FIELDS).forEach(updateSimpleSectionCollapseState);
 }
 
 function toggleSectionCollapse(sectionKey) {
@@ -658,7 +712,8 @@ function toggleSectionCollapse(sectionKey) {
   if (!section) return;
   const currentlyCollapsed = section.classList.contains("collapsed");
   section.dataset.userPref = currentlyCollapsed ? "expanded" : "collapsed";
-  updateSectionCollapseState(sectionKey);
+  if (SIMPLE_SECTION_FIELDS[sectionKey]) updateSimpleSectionCollapseState(sectionKey);
+  else updateSectionCollapseState(sectionKey);
 }
 
 function addRow(sectionKey) {

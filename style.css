@@ -181,23 +181,46 @@ body {
 .btn-toggle-section {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: white;
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform 0.15s, background 0.15s;
-}
-.btn-toggle-section:hover {
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--accent);
+  border-radius: 20px;
   background: var(--accent-light);
   color: var(--accent-dark);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
 }
-.collapsible-section.collapsed .btn-toggle-section {
+.btn-toggle-section:hover {
+  background: var(--accent);
+  color: white;
+}
+.btn-toggle-section .chevron {
+  display: inline-block;
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+.collapsible-section.collapsed .btn-toggle-section .chevron {
   transform: rotate(-90deg);
+}
+
+.collapsible-section .section-head {
+  cursor: pointer;
+  border-radius: 8px;
+  margin: -6px -8px 4px;
+  padding: 6px 8px;
+  transition: background 0.1s;
+}
+.collapsible-section .section-head:hover {
+  background: var(--accent-light);
+}
+/* Buttons inside the header manage their own clicks (add-manually, the
+   toggle itself) -- keep the header's own click-to-toggle from also
+   firing when someone's aiming for one of those. */
+.collapsible-section .section-head-actions {
+  cursor: default;
 }
 
 .collapsible-section.collapsed .section-body {
@@ -215,6 +238,7 @@ body {
   font-size: 13px;
   color: var(--text-muted);
   margin-top: 8px;
+  cursor: pointer;
 }
 .collapsible-section.collapsed .section-collapsed-summary {
   display: block;
@@ -515,8 +539,6 @@ body {
 
 .rrp-grid {
   margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -529,8 +551,6 @@ body {
   border-radius: 20px;
   padding: 7px 8px 7px 14px;
   background: white;
-  flex: 1 1 200px;
-  min-width: 160px;
 }
 .rrp-toggle-label {
   font-size: 12.5px;
