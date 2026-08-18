@@ -310,6 +310,34 @@ for old_w, new_w in zip(tasks_widths_old, tasks_widths_new):
     n = new_tasks_table.count(f'w:w="{old_w}"')
     assert n >= 1, f"Tasks: width {old_w} not found"
     new_tasks_table = new_tasks_table.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+# The above only fixed gridCol (and the 2 columns whose per-cell tcW happened
+# to carry an explicit width). SlNo/Priority/Datafix's per-cell tcW were
+# independently "0" (auto) in the pristine source -- a real authoring
+# inconsistency between gridCol and tcW, not something the literal-value
+# replace above could have caught. Word renders columns from tcW when
+# present, so those 3 columns were effectively auto-sized regardless of the
+# gridCol fix, which is what made this table visibly narrower than the
+# others. Replace all 6 occurrences (3 columns x header+data row) in order.
+_tasks_zero_tcw = '<w:tcW w:w="0" w:type="auto"/>'
+n_tasks_zero = new_tasks_table.count(_tasks_zero_tcw)
+assert n_tasks_zero == 6, f"Tasks: expected 6 zero-width tcW cells (SlNo/Priority/Datafix x 2 rows), got {n_tasks_zero}"
+_tasks_zero_fill = ['804', '1044', '1018', '804', '1044', '1018']  # SlNo/Priority/Datafix, header then data row
+_parts = new_tasks_table.split(_tasks_zero_tcw)
+assert len(_parts) == n_tasks_zero + 1
+new_tasks_table = _parts[0]
+for i, fill in enumerate(_tasks_zero_fill):
+    new_tasks_table += f'<w:tcW w:w="{fill}" w:type="dxa"/>' + _parts[i + 1]
+# Tasks was also missing tblLayout=fixed entirely (CDD/REQ both have it),
+# meaning Word could auto-fit columns to content instead of respecting the
+# declared widths above -- belt-and-suspenders alongside the tcW fix.
+# (tblLayout must come after tblBorders per the OOXML schema's required
+# child-element order within tblPr, not directly after tblW.)
+assert new_tasks_table.count('</w:tblBorders><w:tblLook') == 1, "Tasks: tblPr anchor for tblLayout insert not found"
+new_tasks_table = new_tasks_table.replace(
+    '</w:tblBorders><w:tblLook',
+    '</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblLook',
+    1,
+)
 # Row heights: same 0.4cm standardization as the other three tables.
 tasks_heights_old = ['311', '608']
 for old_h in tasks_heights_old:
