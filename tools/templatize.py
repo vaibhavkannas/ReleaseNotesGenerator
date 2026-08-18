@@ -352,6 +352,20 @@ new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:t
 # URLs, so only the header row is touched here.
 assert new_es_table.count('<w:trHeight w:val="188"/>') == 1, "Environment Summary: header trHeight not found"
 new_es_table = new_es_table.replace('<w:trHeight w:val="188"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
+# The header row's cells also carry explicit top/bottom padding (80 dxa each)
+# that none of the ticket tables' headers have -- that padding adds directly
+# to the rendered row height regardless of trHeight, so setting trHeight
+# alone wasn't enough to make it visually match. Scoped to just the header
+# row (not the data rows, which keep their padding for the wrapped URLs).
+es_rows = re.findall(r'<w:tr .*?</w:tr>', new_es_table, re.S)
+es_header = es_rows[0]
+_es_header_padded_tcmar = '<w:tcMar><w:top w:w="80" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>'
+_es_header_flat_tcmar = '<w:tcMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>'
+n_es_header_tcmar = es_header.count(_es_header_padded_tcmar)
+assert n_es_header_tcmar == 5, f"Environment Summary header: expected 5 padded tcMar cells, got {n_es_header_tcmar}"
+new_es_header = es_header.replace(_es_header_padded_tcmar, _es_header_flat_tcmar)
+assert new_es_table.count(es_header) == 1
+new_es_table = new_es_table.replace(es_header, new_es_header)
 assert data.count(es_table) == 1
 data = data.replace(es_table, new_es_table)
 
