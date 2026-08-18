@@ -206,6 +206,11 @@ body {
   color: var(--text);
 }
 
+.required-mark {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 /* Ticket-row fields sit side by side in a grid. The " ✓ Parsed" suffix
    (see .field.auto-filled label::after below) is short enough that it
    shouldn't wrap in any of these columns, but different browsers/OSes

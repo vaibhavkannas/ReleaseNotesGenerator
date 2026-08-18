@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=12" />
+<link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
 <div class="app">
@@ -280,21 +280,22 @@
       </div>
     </div>
     <div class="derived-fields-label">Here's what we found — please double-check before generating</div>
+    <p class="hint" style="margin-top:-4px;"><span class="required-mark">*</span> required to generate this site's docx</p>
     <div class="grid grid-3">
       <div class="field">
-        <label>Release / CodeDrop version</label>
+        <label>Release / CodeDrop version <span class="required-mark">*</span></label>
         <input type="text" data-field="cdVersion" placeholder="e.g. 118.7.31.2" />
       </div>
       <div class="field">
-        <label>Product version</label>
+        <label>Product version <span class="required-mark">*</span></label>
         <input type="text" data-field="productVersion" />
       </div>
       <div class="field">
-        <label>Framework (FX) version</label>
+        <label>Framework (FX) version <span class="required-mark">*</span></label>
         <input type="text" data-field="fxVersion" />
       </div>
       <div class="field">
-        <label>Release date</label>
+        <label>Release date <span class="required-mark">*</span></label>
         <input type="date" data-field="releaseDate" />
       </div>
       <div class="field">
@@ -330,7 +331,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="parsers.js?v=13"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

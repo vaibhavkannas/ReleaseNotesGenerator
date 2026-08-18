@@ -86,6 +86,9 @@ for tok in ('{{ROW_SLNO}}', '{{ROW_KEY}}', '{{ROW_SUMMARY}}', '{{ROW_PRIORITY}}'
 templated_row = '<!--ROW:CDD-->' + new_row + '<!--/ROW:CDD-->'
 bullet_end = cdd_segment.find('<w:tbl>')
 bullet_para = cdd_segment[:bullet_end]
+# Reduce "Below Defects are Delivered as part of CD..." from 11pt to 10pt.
+assert bullet_para.count('<w:sz w:val="22"/>') == 2, "expected exactly 2 sz=22 runs in CDD bullet paragraph"
+bullet_para = bullet_para.replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
 table_part = cdd_segment[bullet_end:]
 tbl_prefix = table_part[:table_part.find(header)]
 new_table = tbl_prefix + header + templated_row + '</w:tbl>'
@@ -119,7 +122,7 @@ templated_req_row = '<!--ROW:REQ-->' + new_req_row + '<!--/ROW:REQ-->'
 new_req_table = req_prefix + req_header + templated_req_row + '</w:tbl>'
 # Synthesize the intro bullet sentence to match the Tasks Completed / CDD style,
 # since Requirements has no such sentence in the source doc.
-req_bullet_para = '<w:p w14:paraId="62FB2610" w14:textId="0F9C7610" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:pPr><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="22"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="22"/></w:rPr><w:t xml:space="preserve">Below requirements were released as part of CD {{CD_VERSION}} - </w:t></w:r></w:p>'
+req_bullet_para = '<w:p w14:paraId="62FB2610" w14:textId="0F9C7610" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:pPr><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">Below requirements were released as part of CD {{CD_VERSION}} - </w:t></w:r></w:p>'
 # Matches the empty spacer paragraph that CDD/Tasks Completed retain naturally
 # from the source doc between their intro sentence and their table -- without
 # it, Requirements' table sits flush against the sentence while every other
@@ -168,6 +171,9 @@ for tok in ('{{ROW_SLNO}}', '{{ROW_KEY}}', '{{ROW_SUMMARY}}', '{{ROW_PRIORITY}}'
 templated_row = '<!--ROW:TASKS-->' + new_row + '<!--/ROW:TASKS-->'
 bullet_end = tasks_segment.find('<w:tbl>')
 bullet_para = tasks_segment[:bullet_end]
+# Reduce "Below tasks and Sub Tasks are released as part of CD..." from 11pt to 10pt.
+assert bullet_para.count('<w:sz w:val="22"/>') == 2, "expected exactly 2 sz=22 runs in Tasks bullet paragraph"
+bullet_para = bullet_para.replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
 table_part = tasks_segment[bullet_end:]
 tbl_prefix = table_part[:table_part.find(header)]
 new_table = tbl_prefix + header + templated_row + '</w:tbl>'
@@ -187,11 +193,11 @@ data = data.replace(tasks_segment, table_block + na_block)
 # Also drops the label runs from 12pt (sz=24) to 11pt (sz=22) per request.
 one(
     'w14:paraId="42D80303" w14:textId="1C101F18" w:rsidR="00FD7163" w:rsidRPr="00520FCB" w:rsidRDefault="001C6D58" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve">AppSettings.Config change(s) - </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>NA</w:t>',
-    'w14:paraId="42D80303" w14:textId="1C101F18" w:rsidR="00FD7163" w:rsidRPr="00520FCB" w:rsidRDefault="001C6D58" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">AppSettings.Config change(s) - </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>{{APPSETTINGS_TEXT}}</w:t>',
+    'w14:paraId="42D80303" w14:textId="1C101F18" w:rsidR="00FD7163" w:rsidRPr="00520FCB" w:rsidRDefault="001C6D58" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">AppSettings.Config change(s) - </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>{{APPSETTINGS_TEXT}}</w:t>',
 )
 one(
     'w14:paraId="75E97C55" w14:textId="31858B4D" w:rsidR="00CE257F" w:rsidRDefault="007E756C" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>Web Config change(s)</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>- NA</w:t>',
-    'w14:paraId="75E97C55" w14:textId="31858B4D" w:rsidR="00CE257F" w:rsidRDefault="007E756C" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Web Config change(s)</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">- {{WEBCONFIG_TEXT}}</w:t>',
+    'w14:paraId="75E97C55" w14:textId="31858B4D" w:rsidR="00CE257F" w:rsidRDefault="007E756C" w:rsidP="00743EF2"><w:pPr><w:ind w:left="720"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>Web Config change(s)</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r><w:r><w:rPr><w:rFonts w:eastAsia="Calibri" w:cs="Calibri"/><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">- {{WEBCONFIG_TEXT}}</w:t>',
 )
 
 # ==== Release Request Packages (fixed 6 rows) ====
@@ -216,6 +222,26 @@ for pid, tid, val, token in rrp_edits:
     new_para = para.replace(f'<w:t>{val}</w:t>', f'<w:t>{{{{RRP_{token}}}}}</w:t>')
     assert new_para != para, f"no {val!r} value found in RRP paragraph {pid}"
     data = data[:p_idx] + new_para + data[p_end:]
+
+# ==== Environment Summary table column widths ====
+# Requested: first column (Environment) = 2.2cm, all other columns
+# (Core / Partner Portal / Customer Portal / API) = 4cm each.
+_es_idx1 = data.find('Environment Summary')
+_es_idx2 = data.find('Environment Summary', _es_idx1 + 1)
+_es_tbl_start = data.find('<w:tbl>', _es_idx2)
+_es_tbl_end = data.find('</w:tbl>', _es_tbl_start) + len('</w:tbl>')
+es_table = data[_es_tbl_start:_es_tbl_end]
+FIRST_COL_DXA = round(2.2 * 1440 / 2.54)   # 2.2cm -> 1247 dxa
+OTHER_COL_DXA = round(4 * 1440 / 2.54)     # 4cm   -> 2268 dxa
+n_first = es_table.count('w:w="1408"')
+n_other = es_table.count('w:w="2551"')
+assert n_first == 5, f"expected 5 occurrences (1 gridCol + 4 rows) of the first column width, got {n_first}"
+assert n_other == 20, f"expected 20 occurrences (4 gridCol + 4 rows x 4 cols) of the other column width, got {n_other}"
+new_es_table = es_table.replace('w:w="1408"', f'w:w="{FIRST_COL_DXA}"').replace('w:w="2551"', f'w:w="{OTHER_COL_DXA}"')
+new_total = FIRST_COL_DXA + 4 * OTHER_COL_DXA
+new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:tblW w:w="{new_total}" w:type="dxa"/>', 1)
+assert data.count(es_table) == 1
+data = data.replace(es_table, new_es_table)
 
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
