@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=11" />
+<link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
 <div class="app">
@@ -47,7 +47,7 @@
 
     <!-- Sites -->
     <section class="card">
-      <h2>1. Sites for this release</h2>
+      <h2><span class="step-num">1</span>Sites for this release</h2>
       <p class="hint">Pick every site this code drop touches. Each site gets its own Release Details / Packages below, and its own generated docx.</p>
       <div class="chip-group" id="siteChips">
         <label class="chip"><input type="checkbox" name="site" value="Core" checked><span>Core</span></label>
@@ -58,22 +58,18 @@
 
     <!-- Release Details per site -->
     <section class="card">
-      <h2>2. Release details &amp; Request Packages</h2>
+      <h2><span class="step-num">2</span>Release details &amp; Request Packages</h2>
       <p class="hint">Paste the same kind of note you'd normally type out — version, product version, fx version, date, hotfix, type, packages. We'll parse it and fill the fields in; double-check before generating.</p>
       <div id="siteDetailCards"></div>
     </section>
 
     <!-- Ticket paste importer -->
     <section class="card">
-      <h2>3. Tickets — paste from Excel</h2>
+      <h2><span class="step-num">3</span>Tickets — paste from Excel</h2>
       <p class="hint">
-        Click any cell and paste your rows straight from your tracking sheet (tab-separated — copying a
-        range out of Excel or Google Sheets works as-is). The grid grows to fit what you paste. Columns like
-        <em>Issue Type, Issue key, Summary, Priority, Type, Core/PP/CP</em> are recognized automatically —
-        if your sheet includes its own header row, it's fine to paste that too, it'll be ignored.
-        Tickets are routed to the right section automatically: Bugs → Code Drop Defects, Requirements → Requirements,
-        RBS/EBC/Portfolio/User Config → Business Configuration, everything else → Tasks Completed. Within any section
-        that has a Priority field, tickets are always kept ordered Critical → Highest → High → Medium → Low.
+        Click any cell and paste your rows — copying straight out of Excel or Google Sheets works as-is,
+        header row and all (we'll ignore it if you include one). The grid grows to fit what you paste, and
+        we'll automatically sort tickets into the right section below, ordered by priority.
       </p>
       <div class="paste-zone">
         <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows</div>
@@ -117,7 +113,7 @@
     <!-- Business Configuration -->
     <section class="card" data-section="bizconfig">
       <div class="section-head">
-        <h2>4. Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
+        <h2><span class="step-num">4</span>Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
         <button type="button" class="btn btn-add" data-add="bizconfig">+ Add manually</button>
       </div>
       <p class="hint">Empty → automatically reads <strong>"No RBS Impact"</strong>.</p>
@@ -141,7 +137,7 @@
     <!-- Requirements -->
     <section class="card" data-section="req">
       <div class="section-head">
-        <h2>5. Requirements</h2>
+        <h2><span class="step-num">5</span>Requirements</h2>
         <button type="button" class="btn btn-add" data-add="req">+ Add manually</button>
       </div>
       <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
@@ -169,7 +165,7 @@
 
     <!-- Migration & E2E -->
     <section class="card">
-      <h2>6. Migration &amp; E2E Scenarios</h2>
+      <h2><span class="step-num">6</span>Migration &amp; E2E Scenarios</h2>
       <div class="grid grid-2">
         <div class="field">
           <label for="migrationText">Migration</label>
@@ -185,7 +181,7 @@
     <!-- Tasks Completed -->
     <section class="card" data-section="tasks">
       <div class="section-head">
-        <h2>7. Tasks Completed</h2>
+        <h2><span class="step-num">7</span>Tasks Completed</h2>
         <button type="button" class="btn btn-add" data-add="tasks">+ Add manually</button>
       </div>
       <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
@@ -214,7 +210,7 @@
     <!-- Code Drop Defects -->
     <section class="card" data-section="cdd">
       <div class="section-head">
-        <h2>8. Code Drop Defects</h2>
+        <h2><span class="step-num">8</span>Code Drop Defects</h2>
         <button type="button" class="btn btn-add" data-add="cdd">+ Add manually</button>
       </div>
       <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
@@ -242,7 +238,7 @@
 
     <!-- Technical Configuration -->
     <section class="card">
-      <h2>9. Technical Configuration</h2>
+      <h2><span class="step-num">9</span>Technical Configuration</h2>
       <div class="grid grid-2">
         <div class="field">
           <label for="appSettingsText">AppSettings.Config change(s)</label>
@@ -283,7 +279,7 @@
         <span class="status-msg" data-parse-status></span>
       </div>
     </div>
-    <div class="derived-fields-label">Parsed fields — check before generating</div>
+    <div class="derived-fields-label">Here's what we found — please double-check before generating</div>
     <div class="grid grid-3">
       <div class="field">
         <label>Release / CodeDrop version</label>
@@ -334,7 +330,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="parsers.js?v=12"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
