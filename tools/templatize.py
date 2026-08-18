@@ -349,5 +349,35 @@ new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:t
 assert data.count(es_table) == 1
 data = data.replace(es_table, new_es_table)
 
+# ==== Document Revision History table header color ====
+# This table uses a built-in Word table style ("ListTable4-Accent4") rather
+# than inline per-cell shading like every other table in the doc, so its
+# header renders in that style's own accent color instead of matching the
+# literal navy used everywhere else. Add explicit inline shading to just the
+# header row's 4 cells (text is already white, so no other change needed).
+_drh_idx1 = data.find('Document Revision History')
+_drh_idx2 = data.find('Document Revision History', _drh_idx1 + 1)
+_drh_tbl_start = data.find('<w:tbl>', _drh_idx2)
+_drh_tbl_end = data.find('</w:tbl>', _drh_tbl_start) + len('</w:tbl>')
+drh_table = data[_drh_tbl_start:_drh_tbl_end]
+drh_rows = re.findall(r'<w:tr .*?</w:tr>', drh_table, re.S)
+drh_header = drh_rows[0]
+drh_header_cells_old = [
+    '<w:tcPr><w:cnfStyle w:val="001000000000" w:firstRow="0" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:oddVBand="0" w:evenVBand="0" w:oddHBand="0" w:evenHBand="0" w:firstRowFirstColumn="0" w:firstRowLastColumn="0" w:lastRowFirstColumn="0" w:lastRowLastColumn="0"/><w:tcW w:w="1000" w:type="pct"/></w:tcPr>',
+    '<w:tcPr><w:tcW w:w="2000" w:type="pct"/></w:tcPr>',
+    '<w:tcPr><w:tcW w:w="579" w:type="pct"/></w:tcPr>',
+    '<w:tcPr><w:tcW w:w="1421" w:type="pct"/></w:tcPr>',
+]
+new_drh_header = drh_header
+for old_cell in drh_header_cells_old:
+    n = new_drh_header.count(old_cell)
+    assert n == 1, f"Document Revision History header: expected 1 occurrence of {old_cell[:50]!r}, got {n}"
+    new_cell = old_cell.replace('</w:tcPr>', '<w:shd w:val="clear" w:color="auto" w:fill="104861"/></w:tcPr>')
+    new_drh_header = new_drh_header.replace(old_cell, new_cell)
+assert drh_table.count(drh_header) == 1
+new_drh_table = drh_table.replace(drh_header, new_drh_header)
+assert data.count(drh_table) == 1
+data = data.replace(drh_table, new_drh_table)
+
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
