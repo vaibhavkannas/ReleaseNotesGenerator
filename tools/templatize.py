@@ -89,6 +89,12 @@ bullet_para = cdd_segment[:bullet_end]
 # Reduce "Below Defects are Delivered as part of CD..." from 11pt to 10pt.
 assert bullet_para.count('<w:sz w:val="22"/>') == 2, "expected exactly 2 sz=22 runs in CDD bullet paragraph"
 bullet_para = bullet_para.replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
+# Shrink the blank spacer line before the table from its default ~10.5pt down
+# to 5pt, so there's still a visible gap but a much smaller one.
+_cdd_spacer_old = '<w:p w14:paraId="5D0CB30A" w14:textId="77777777" w:rsidR="002216C2" w:rsidRPr="002216C2" w:rsidRDefault="002216C2" w:rsidP="002216C2"/>'
+_cdd_spacer_new = '<w:p w14:paraId="5D0CB30A" w14:textId="77777777" w:rsidR="002216C2" w:rsidRPr="002216C2" w:rsidRDefault="002216C2" w:rsidP="002216C2"><w:pPr><w:rPr><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr></w:pPr></w:p>'
+assert bullet_para.count(_cdd_spacer_old) == 1, "CDD spacer paragraph not found in expected form"
+bullet_para = bullet_para.replace(_cdd_spacer_old, _cdd_spacer_new)
 table_part = cdd_segment[bullet_end:]
 tbl_prefix = table_part[:table_part.find(header)]
 new_table = tbl_prefix + header + templated_row + '</w:tbl>'
@@ -127,7 +133,7 @@ req_bullet_para = '<w:p w14:paraId="62FB2610" w14:textId="0F9C7610" w:rsidR="001
 # from the source doc between their intro sentence and their table -- without
 # it, Requirements' table sits flush against the sentence while every other
 # section has a visible gap.
-req_spacer_para = '<w:p w14:paraId="62FB2611" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRPr="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"/>'
+req_spacer_para = '<w:p w14:paraId="62FB2611" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRPr="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:rPr><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr></w:pPr></w:p>'
 table_block = '<!--BLOCK:REQ:TABLE_START-->' + req_bullet_para + req_spacer_para + new_req_table + '<!--BLOCK:REQ:TABLE_END-->'
 
 req_na_para = '<w:p w14:paraId="146E8121" w14:textId="77777777" w:rsidR="00AD2C1D" w:rsidRDefault="00BE259B"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t></w:r></w:p>'
@@ -174,6 +180,12 @@ bullet_para = tasks_segment[:bullet_end]
 # Reduce "Below tasks and Sub Tasks are released as part of CD..." from 11pt to 10pt.
 assert bullet_para.count('<w:sz w:val="22"/>') == 2, "expected exactly 2 sz=22 runs in Tasks bullet paragraph"
 bullet_para = bullet_para.replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
+# Shrink the blank spacer line before the table from its default ~10.5pt down
+# to 5pt, so there's still a visible gap but a much smaller one.
+_tasks_spacer_old = '<w:p w14:paraId="05626A9F" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"/>'
+_tasks_spacer_new = '<w:p w14:paraId="05626A9F" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:rPr><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr></w:pPr></w:p>'
+assert bullet_para.count(_tasks_spacer_old) == 1, "Tasks spacer paragraph not found in expected form"
+bullet_para = bullet_para.replace(_tasks_spacer_old, _tasks_spacer_new)
 table_part = tasks_segment[bullet_end:]
 tbl_prefix = table_part[:table_part.find(header)]
 new_table = tbl_prefix + header + templated_row + '</w:tbl>'
@@ -222,6 +234,79 @@ for pid, tid, val, token in rrp_edits:
     new_para = para.replace(f'<w:t>{val}</w:t>', f'<w:t>{{{{RRP_{token}}}}}</w:t>')
     assert new_para != para, f"no {val!r} value found in RRP paragraph {pid}"
     data = data[:p_idx] + new_para + data[p_end:]
+
+# ==== Normalize fonts/sizes/widths across the ticket tables ====
+# The base doc's Business Configuration / Requirements / Tasks Completed /
+# Code Drop Defects tables were each authored independently (evidently at
+# different times), so they disagree on font (Calibri vs "Aptos Narrow"),
+# size (10pt/10.5pt/11pt), and column proportions -- invisible in some
+# renderers that silently substitute a fallback font, but visibly
+# inconsistent in Word itself. Bring them all to a single standard: Calibri,
+# 10pt, and matching column widths for the columns they share (SlNo/Issue
+# key line up the same regardless of which section you're looking at).
+
+def normalize_table_font(table_xml, table_name):
+    n_aptos = table_xml.count('Aptos Narrow')
+    n_sz22 = table_xml.count('<w:sz w:val="22"/>')
+    if n_aptos or n_sz22:
+        table_xml = table_xml.replace('Aptos Narrow', 'Calibri').replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
+    return table_xml
+
+def get_table(marker_start):
+    idx = data.find(marker_start)
+    assert idx != -1, f"marker not found: {marker_start}"
+    tbl_start = data.find('<w:tbl>', idx)
+    tbl_end = data.find('</w:tbl>', tbl_start) + len('</w:tbl>')
+    return data[tbl_start:tbl_end]
+
+# --- Business Configuration: has Calibri already, but sizes were never set
+# explicitly (silently inheriting an ambiguous ~10.5pt default) -- pin to 10pt,
+# and widen/rebalance columns to line up with the other ticket tables below.
+biz_table = get_table('BLOCK:BIZCONFIG:TABLE_START')
+n_biz_szcs21 = biz_table.count('<w:szCs w:val="21"/>')
+assert n_biz_szcs21 == 15, f"expected 15 szCs=21 runs in BizConfig table, got {n_biz_szcs21}"
+new_biz_table = biz_table.replace('<w:szCs w:val="21"/>', '<w:sz w:val="20"/><w:szCs w:val="20"/>')
+biz_widths_old = ['924', '1409', '6516', '1079']
+biz_widths_new = ['804', '1497', '6546', '1079']  # SlNo/IssueKey widths now match REQ/TASKS/CDD below
+for old_w, new_w in zip(biz_widths_old, biz_widths_new):
+    n = new_biz_table.count(f'w:w="{old_w}"')
+    assert n >= 1, f"BizConfig: width {old_w} not found"
+    new_biz_table = new_biz_table.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+assert data.count(biz_table) == 1
+data = data.replace(biz_table, new_biz_table)
+
+# --- Requirements / Code Drop Defects: already share identical column widths
+# (REQ was cloned from CDD's structure) and just need the font/size fix.
+for marker, label in [('BLOCK:REQ:TABLE_START', 'Requirements'), ('BLOCK:CDD:TABLE_START', 'CDD')]:
+    t = get_table(marker)
+    new_t = normalize_table_font(t, label)
+    assert new_t != t, f"{label}: expected font/size normalization to change something"
+    assert data.count(t) == 1
+    data = data.replace(t, new_t)
+
+# --- Tasks Completed: needs font/size fix AND a column-width rebalance to
+# match Requirements/CDD's proportions (its table was authored separately
+# with its own, different widths).
+tasks_table = get_table('BLOCK:TASKS:TABLE_START')
+new_tasks_table = normalize_table_font(tasks_table, 'Tasks')
+tasks_widths_old = ['666', '1314', '6173', '888', '844']
+tasks_widths_new = ['804', '1497', '5563', '1044', '1018']  # matches REQ/CDD exactly
+for old_w, new_w in zip(tasks_widths_old, tasks_widths_new):
+    n = new_tasks_table.count(f'w:w="{old_w}"')
+    assert n >= 1, f"Tasks: width {old_w} not found"
+    new_tasks_table = new_tasks_table.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+assert data.count(tasks_table) == 1
+data = data.replace(tasks_table, new_tasks_table)
+
+# --- Header color: the Release Request Packages and Environment Summary
+# tables' headers reference a theme color (accent1) that resolves to a
+# visibly different, lighter blue than the literal navy every other table
+# header uses. Pin both to the same literal color for a consistent look.
+_old_header_fill = '<w:shd w:val="clear" w:color="auto" w:fill="156082" w:themeFill="accent1"/>'
+_new_header_fill = '<w:shd w:val="clear" w:color="auto" w:fill="104861"/>'
+n_header_fill = data.count(_old_header_fill)
+assert n_header_fill == 8, f"expected 8 occurrences (RRP + Environment Summary headers), got {n_header_fill}"
+data = data.replace(_old_header_fill, _new_header_fill)
 
 # ==== Environment Summary table column widths ====
 # Requested: first column (Environment) = 2.2cm, all other columns
