@@ -272,6 +272,16 @@ for old_w, new_w in zip(biz_widths_old, biz_widths_new):
     n = new_biz_table.count(f'w:w="{old_w}"')
     assert n >= 1, f"BizConfig: width {old_w} not found"
     new_biz_table = new_biz_table.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+# Row heights: BizConfig's header/data rows used their own independently-authored
+# minimum heights (240/237), different from Requirements/CDD's tighter,
+# content-hugging values (331/183) -- align them so rows don't look "puffier"
+# in one table than another.
+biz_heights_old = ['240', '237']
+biz_heights_new = ['331', '183']
+for old_h, new_h in zip(biz_heights_old, biz_heights_new):
+    n = new_biz_table.count(f'<w:trHeight w:val="{old_h}"/>')
+    assert n == 1, f"BizConfig: trHeight {old_h} not found exactly once, got {n}"
+    new_biz_table = new_biz_table.replace(f'<w:trHeight w:val="{old_h}"/>', f'<w:trHeight w:val="{new_h}"/>')
 assert data.count(biz_table) == 1
 data = data.replace(biz_table, new_biz_table)
 
@@ -295,6 +305,16 @@ for old_w, new_w in zip(tasks_widths_old, tasks_widths_new):
     n = new_tasks_table.count(f'w:w="{old_w}"')
     assert n >= 1, f"Tasks: width {old_w} not found"
     new_tasks_table = new_tasks_table.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+# Row heights: the data row's minimum height (608 dxa, ~0.42in) was much taller
+# than its content needs, unlike Requirements/CDD's tightly-fit 183 dxa row --
+# this is what made Tasks Completed's rows look visibly "un-fitted" next to
+# every other ticket table. Align both header and data row to match.
+tasks_heights_old = ['311', '608']
+tasks_heights_new = ['331', '183']
+for old_h, new_h in zip(tasks_heights_old, tasks_heights_new):
+    n = new_tasks_table.count(f'<w:trHeight w:val="{old_h}"/>')
+    assert n == 1, f"Tasks: trHeight {old_h} not found exactly once, got {n}"
+    new_tasks_table = new_tasks_table.replace(f'<w:trHeight w:val="{old_h}"/>', f'<w:trHeight w:val="{new_h}"/>')
 assert data.count(tasks_table) == 1
 data = data.replace(tasks_table, new_tasks_table)
 
