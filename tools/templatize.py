@@ -412,3 +412,19 @@ data = data.replace(drh_table, new_drh_table)
 
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
+
+# ==== Heading2 style: 16pt -> 14pt ====
+# Every major section heading (Business Configuration, Requirements, Migration,
+# E2E Scenarios, Tasks Completed, Code Drop Defects, Release Details,
+# Environment Summary, Technical Configuration, Release Request Package(s))
+# uses the same "Heading2" paragraph style, so this is edited once at the
+# style level rather than per-heading -- keeps them all consistent with each
+# other, which is the same standard applied to the tables all session.
+styles_path = 'unpacked/word/styles.xml'
+styles_data = open(styles_path, encoding='utf-8').read()
+_old_heading2_sz = '<w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"'
+_new_heading2_sz = '<w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"'
+assert styles_data.count(_old_heading2_sz) == 1, "Heading2 style sz=32 anchor not found"
+styles_data = styles_data.replace(_old_heading2_sz, _new_heading2_sz)
+open(styles_path, 'w', encoding='utf-8').write(styles_data)
+print("Heading2 style updated to 14pt.")
