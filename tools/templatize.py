@@ -495,6 +495,16 @@ for _old_wrap in _wrap_matches:
     assert data.count(_old_wrap) == 1
     data = data.replace(_old_wrap, '<wp:wrapNone/>')
 
+# ==== Breathing room before "Environment Summary" ====
+# It currently sits flush against the bottom border of the Release Details
+# table with no gap at all, which reads as congested. Insert a blank line
+# between them, matching the pattern used elsewhere in the doc for spacing
+# between a table and the next heading.
+_es_heading_anchor = '</w:tbl><w:p w14:paraId="02C7775B"'
+assert data.count(_es_heading_anchor) == 1, "Environment Summary heading anchor not found"
+_es_spacer_para = '<w:p w14:paraId="62FB2612" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"/>'
+data = data.replace(_es_heading_anchor, '</w:tbl>' + _es_spacer_para + '<w:p w14:paraId="02C7775B"', 1)
+
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
 
