@@ -276,10 +276,20 @@ document.addEventListener("DOMContentLoaded", () => {
   buildSiteDetailCards();
   Object.keys(SECTION_CONFIG).forEach(refreshSiteTagsForSection);
   updateSiteDetailVisibility();
+  updateAllSectionCollapseStates();
   loadRememberedTemplateIfAny();
 
   document.querySelectorAll("[data-add]").forEach(btn => {
-    btn.addEventListener("click", () => addRow(btn.dataset.add));
+    btn.addEventListener("click", () => {
+      const section = document.querySelector(`.collapsible-section[data-section="${btn.dataset.add}"]`);
+      if (section) section.dataset.userPref = "expanded";
+      addRow(btn.dataset.add);
+      updateSectionCollapseState(btn.dataset.add);
+    });
+  });
+
+  document.querySelectorAll("[data-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => toggleSectionCollapse(btn.dataset.toggle));
   });
 
   document.querySelectorAll('input[name="site"]').forEach(cb => {
@@ -351,6 +361,7 @@ function scheduleFormChangeHandlers() {
   clearTimeout(formChangeTimer);
   formChangeTimer = setTimeout(() => {
     sortAllSectionsByPriority();
+    updateAllSectionCollapseStates();
     renderSummary();
     validateForm();
     autosaveDraft();
@@ -613,6 +624,43 @@ function getSiteFormValues(site) {
 
 // ---------- Ticket rows (manual add + paste import) ----------
 
+const SECTION_EMPTY_FALLBACK = {
+  bizconfig: "No RBS Impact",
+  req: "NA",
+  tasks: "NA",
+  cdd: "NA",
+};
+
+// Collapse state per section follows the person's last explicit choice
+// (data-user-pref: "expanded" | "collapsed") once they've made one; before
+// that, it defaults to collapsed-when-empty / expanded-when-it-has-tickets.
+function updateSectionCollapseState(sectionKey) {
+  const section = document.querySelector(`.collapsible-section[data-section="${sectionKey}"]`);
+  if (!section) return;
+  const count = document.getElementById(`${sectionKey}-rows`).children.length;
+  const summaryEl = section.querySelector(`[data-collapsed-summary="${sectionKey}"]`);
+  if (summaryEl) {
+    summaryEl.textContent = count > 0
+      ? `${count} ticket${count === 1 ? "" : "s"} added — click to expand/collapse.`
+      : `Empty → automatically reads "${SECTION_EMPTY_FALLBACK[sectionKey]}". Click to expand and add one manually.`;
+  }
+  const pref = section.dataset.userPref;
+  const shouldCollapse = pref === "expanded" ? false : pref === "collapsed" ? true : count === 0;
+  section.classList.toggle("collapsed", shouldCollapse);
+}
+
+function updateAllSectionCollapseStates() {
+  Object.keys(SECTION_CONFIG).forEach(updateSectionCollapseState);
+}
+
+function toggleSectionCollapse(sectionKey) {
+  const section = document.querySelector(`.collapsible-section[data-section="${sectionKey}"]`);
+  if (!section) return;
+  const currentlyCollapsed = section.classList.contains("collapsed");
+  section.dataset.userPref = currentlyCollapsed ? "expanded" : "collapsed";
+  updateSectionCollapseState(sectionKey);
+}
+
 function addRow(sectionKey) {
   const tpl = document.getElementById(`row-tpl-${sectionKey}`);
   const container = document.getElementById(`${sectionKey}-rows`);
@@ -654,6 +702,7 @@ function moveTicketRow(rowEl, fromKey, toKey) {
   rowEl.remove();
   addRowWithData(toKey, record, false);
   sortAllSectionsByPriority();
+  updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
   autosaveDraft();
@@ -766,6 +815,7 @@ function onParseTickets() {
   statusEl.className = "status-msg ok";
   statusEl.textContent = msg;
   sortAllSectionsByPriority();
+  updateAllSectionCollapseStates();
   validateForm();
 }
 
@@ -1159,6 +1209,7 @@ function onClearParsedTickets() {
   Object.keys(SECTION_CONFIG).forEach(sec => {
     document.getElementById(`${sec}-rows`).innerHTML = "";
   });
+  updateAllSectionCollapseStates();
   validateForm();
 }
 
@@ -1203,6 +1254,7 @@ function onResetAll() {
 
   clearGeneratedFilesPanel();
   Store.remove(AUTOSAVE_KEY);
+  updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
 }
@@ -1272,6 +1324,7 @@ function restoreFormState(state) {
   else initGrid();
 
   sortAllSectionsByPriority();
+  updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
 }

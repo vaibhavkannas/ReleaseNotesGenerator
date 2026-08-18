@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=13" />
+<link rel="stylesheet" href="style.css?v=14" />
 </head>
 <body>
 <div class="app">
@@ -111,13 +111,19 @@
     </section>
 
     <!-- Business Configuration -->
-    <section class="card" data-section="bizconfig">
+    <section class="card collapsible-section" data-section="bizconfig">
       <div class="section-head">
         <h2><span class="step-num">4</span>Business Configuration <span class="col-note">(RBS / EBC)</span></h2>
-        <button type="button" class="btn btn-add" data-add="bizconfig">+ Add manually</button>
+        <div class="section-head-actions">
+          <button type="button" class="btn-toggle-section" data-toggle="bizconfig" title="Expand / collapse" aria-label="Expand or collapse this section">▾</button>
+          <button type="button" class="btn btn-add" data-add="bizconfig">+ Add manually</button>
+        </div>
       </div>
-      <p class="hint">Empty → automatically reads <strong>"No RBS Impact"</strong>.</p>
-      <div class="rows" id="bizconfig-rows"></div>
+      <p class="section-collapsed-summary" data-collapsed-summary="bizconfig"></p>
+      <div class="section-body" data-section-body="bizconfig">
+        <p class="hint">Empty → automatically reads <strong>"No RBS Impact"</strong>.</p>
+        <div class="rows" id="bizconfig-rows"></div>
+      </div>
       <template id="row-tpl-bizconfig">
         <div class="ticket-row">
           <div class="row-actions">
@@ -135,13 +141,19 @@
     </section>
 
     <!-- Requirements -->
-    <section class="card" data-section="req">
+    <section class="card collapsible-section" data-section="req">
       <div class="section-head">
         <h2><span class="step-num">5</span>Requirements</h2>
-        <button type="button" class="btn btn-add" data-add="req">+ Add manually</button>
+        <div class="section-head-actions">
+          <button type="button" class="btn-toggle-section" data-toggle="req" title="Expand / collapse" aria-label="Expand or collapse this section">▾</button>
+          <button type="button" class="btn btn-add" data-add="req">+ Add manually</button>
+        </div>
       </div>
-      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
-      <div class="rows" id="req-rows"></div>
+      <p class="section-collapsed-summary" data-collapsed-summary="req"></p>
+      <div class="section-body" data-section-body="req">
+        <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
+        <div class="rows" id="req-rows"></div>
+      </div>
       <template id="row-tpl-req">
         <div class="ticket-row">
           <div class="row-actions">
@@ -179,13 +191,19 @@
     </section>
 
     <!-- Tasks Completed -->
-    <section class="card" data-section="tasks">
+    <section class="card collapsible-section" data-section="tasks">
       <div class="section-head">
         <h2><span class="step-num">7</span>Tasks Completed</h2>
-        <button type="button" class="btn btn-add" data-add="tasks">+ Add manually</button>
+        <div class="section-head-actions">
+          <button type="button" class="btn-toggle-section" data-toggle="tasks" title="Expand / collapse" aria-label="Expand or collapse this section">▾</button>
+          <button type="button" class="btn btn-add" data-add="tasks">+ Add manually</button>
+        </div>
       </div>
-      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
-      <div class="rows" id="tasks-rows"></div>
+      <p class="section-collapsed-summary" data-collapsed-summary="tasks"></p>
+      <div class="section-body" data-section-body="tasks">
+        <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
+        <div class="rows" id="tasks-rows"></div>
+      </div>
       <template id="row-tpl-tasks">
         <div class="ticket-row">
           <div class="row-actions">
@@ -208,13 +226,19 @@
     </section>
 
     <!-- Code Drop Defects -->
-    <section class="card" data-section="cdd">
+    <section class="card collapsible-section" data-section="cdd">
       <div class="section-head">
         <h2><span class="step-num">8</span>Code Drop Defects</h2>
-        <button type="button" class="btn btn-add" data-add="cdd">+ Add manually</button>
+        <div class="section-head-actions">
+          <button type="button" class="btn-toggle-section" data-toggle="cdd" title="Expand / collapse" aria-label="Expand or collapse this section">▾</button>
+          <button type="button" class="btn btn-add" data-add="cdd">+ Add manually</button>
+        </div>
       </div>
-      <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
-      <div class="rows" id="cdd-rows"></div>
+      <p class="section-collapsed-summary" data-collapsed-summary="cdd"></p>
+      <div class="section-body" data-section-body="cdd">
+        <p class="hint">Empty → automatically reads <strong>"NA"</strong>.</p>
+        <div class="rows" id="cdd-rows"></div>
+      </div>
       <template id="row-tpl-cdd">
         <div class="ticket-row">
           <div class="row-actions">
@@ -331,7 +355,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="parsers.js?v=14"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

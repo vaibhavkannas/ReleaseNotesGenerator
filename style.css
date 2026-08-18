@@ -171,6 +171,55 @@ body {
 }
 .section-head h2 { margin: 0; }
 
+.section-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-toggle-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: white;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.btn-toggle-section:hover {
+  background: var(--accent-light);
+  color: var(--accent-dark);
+}
+.collapsible-section.collapsed .btn-toggle-section {
+  transform: rotate(-90deg);
+}
+
+.collapsible-section.collapsed .section-body {
+  display: none;
+}
+.collapsible-section.collapsed {
+  padding-bottom: 20px;
+}
+.collapsible-section.collapsed .section-head {
+  margin-bottom: 0;
+}
+
+.section-collapsed-summary {
+  display: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+.collapsible-section.collapsed .section-collapsed-summary {
+  display: block;
+}
+
 .grid {
   display: grid;
   gap: 14px;
