@@ -188,16 +188,16 @@ body {
   color: var(--text);
 }
 
-/* Ticket-row fields sit side by side in a grid, and the " ✓ auto-filled"
-   suffix (see .field.auto-filled label::after below) wraps to a second
-   line in narrower columns (Issue Key / Priority / Datafix) but not in
-   the wider Summary column. Without a reserved height, that means each
-   field's input starts at a different vertical position depending on
-   whether its own label happened to wrap -- reserve two lines' worth
-   of height so every field's input lines up regardless. */
+/* Ticket-row fields sit side by side in a grid. The " ✓ Parsed" suffix
+   (see .field.auto-filled label::after below) is short enough that it
+   shouldn't wrap in any of these columns, but different browsers/OSes
+   render fonts at very slightly different widths, so as a safety net we
+   still reserve two lines' worth of label height -- if a suffix ever does
+   wrap in some environment, every field's input still lines up regardless
+   of whether its own label happened to wrap. */
 .grid-ticket-4 .field > label,
 .grid-ticket-5 .field > label {
-  min-height: 2.4em;
+  min-height: 2.6em;
 }
 
 .field input[type="text"],
@@ -650,7 +650,7 @@ body {
   box-shadow: inset 3px 0 0 #2e9e5b;
 }
 .field.auto-filled label::after {
-  content: " ✓ auto-filled";
+  content: " ✓ Parsed";
   font-weight: 500;
   font-size: 10.5px;
   color: #2e9e5b;
