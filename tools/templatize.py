@@ -497,13 +497,20 @@ for _old_wrap in _wrap_matches:
 
 # ==== Breathing room before "Environment Summary" ====
 # It currently sits flush against the bottom border of the Release Details
-# table with no gap at all, which reads as congested. Insert a blank line
-# between them, matching the pattern used elsewhere in the doc for spacing
-# between a table and the next heading.
+# table with no gap at all, which reads as congested. Neither a lone spacer
+# paragraph nor a lone space-before override produced a strongly visible
+# gap on their own (paragraph-after-a-table spacing behaves differently
+# from paragraph-after-paragraph spacing) -- combining both stacks the
+# effect into something actually visible.
 _es_heading_anchor = '</w:tbl><w:p w14:paraId="02C7775B"'
 assert data.count(_es_heading_anchor) == 1, "Environment Summary heading anchor not found"
-_es_spacer_para = '<w:p w14:paraId="62FB2612" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"/>'
+_es_spacer_para = '<w:p w14:paraId="62FB2612" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r></w:p>'
 data = data.replace(_es_heading_anchor, '</w:tbl>' + _es_spacer_para + '<w:p w14:paraId="02C7775B"', 1)
+
+_es_heading_pPr_old = '<w:p w14:paraId="02C7775B" w14:textId="5CAF30A1" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:pStyle w:val="Heading2"/><w:rPr><w:lang w:eastAsia="en-IN" w:bidi="ar-SA"/></w:rPr></w:pPr>'
+_es_heading_pPr_new = '<w:p w14:paraId="02C7775B" w14:textId="5CAF30A1" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="480"/><w:rPr><w:lang w:eastAsia="en-IN" w:bidi="ar-SA"/></w:rPr></w:pPr>'
+assert data.count(_es_heading_pPr_old) == 1, "Environment Summary heading pPr not found"
+data = data.replace(_es_heading_pPr_old, _es_heading_pPr_new, 1)
 
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
