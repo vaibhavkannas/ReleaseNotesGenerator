@@ -1,6 +1,10 @@
 /* FOCUS Release Notes Generator — app logic */
 
-const TEMPLATE_URL = "assets/master_template.docx";
+// Bump this whenever assets/master_template.docx changes -- without it,
+// a browser or CDN cache can keep serving a stale template indefinitely,
+// since (unlike the CSS/JS below) this file was never cache-busted before.
+const TEMPLATE_VERSION = 1;
+const TEMPLATE_URL = `assets/master_template.docx?v=${TEMPLATE_VERSION}`;
 
 const SITES = ["Core", "Partner Portal", "Customer Portal"];
 const SITE_LABELS = {
