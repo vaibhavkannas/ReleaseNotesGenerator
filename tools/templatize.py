@@ -13,12 +13,12 @@ def one(old, new):
 one('<w:t>7.30.2</w:t>', '<w:t>{{CD_VERSION}}</w:t>')
 one('<w:t>CodeDrop7.30.2</w:t>', '<w:t>CodeDrop{{CD_VERSION}}</w:t>')
 one('<w:t>118.7.30.2</w:t>', '<w:t>{{FULL_VERSION}}</w:t>')
-# NOTE: this template phrases the two "as part of CD X" sentences differently
-# ("...are released as part of CD 7.30.2" for Tasks Completed, vs "...are
-# Delivered as part of CD 7.30.2" for Code Drop Defects), so we match on the
-# "as part of CD X" tail rather than hardcoding the verb.
+# NOTE: this template phrases the three "as part of CD X" sentences differently
+# ("...are released as part of CD 7.30.2" for Requirements/Tasks Completed, vs
+# "...are Delivered as part of CD 7.30.2" for Code Drop Defects), so we match
+# on the "as part of CD X" tail rather than hardcoding the verb.
 n_cd_sentences = len(re.findall(r'as part of CD 7\.30\.2', data))
-assert n_cd_sentences == 2, f"expected 2 'as part of CD' sentences, got {n_cd_sentences}"
+assert n_cd_sentences == 3, f"expected 3 'as part of CD' sentences, got {n_cd_sentences}"
 data = re.sub(r'as part of CD 7\.30\.2', 'as part of CD {{CD_VERSION}}', data)
 
 # ---- Dates ----
@@ -106,74 +106,60 @@ assert data.count(cdd_segment) == 1
 data = data.replace(cdd_segment, table_block + na_block)
 
 # ==== Requirements (bullet + table <-> NA) ====
-# UNLIKE the previous base template, this doc's Requirements section ships as
-# a bare "NA" paragraph with no example table -- there's nothing to derive a
-# row template from directly. We synthesize the block by cloning the Code
-# Drop Defects table structure (same 5-column schema: SlNo/Key/Summary/
-# Priority/Datafix -- confirmed against app.js SECTION_CONFIG) and re-minting
-# fresh paraIds so they don't collide with the CDD copy. The genuine NA
-# paragraph in this doc becomes the real BLOCK:REQ:NA_START content.
-#
-# Requirements doesn't need a Datafix column (per request), so after cloning
-# CDD's 5-column structure, the 5th column is dropped from both the header
-# and the row template, and its width (1018 dxa) is folded into Summary so
-# the table still totals 9926 dxa, matching every other ticket table.
-req_rows = re.findall(r'<w:tr .*?</w:tr>', cdd_source_table, re.S)
-req_header, req_row1 = req_rows[0], req_rows[1]
-req_prefix = cdd_source_table[:cdd_source_table.find(req_header)]
+# The base doc now ships Requirements with a genuine example table of its own
+# (2 rows, 4 columns: SlNo/Key/Summary/Priority -- no Datafix), so this now
+# extracts it directly rather than synthesizing from Code Drop Defects.
+req_seg_start = data.find('<w:p w14:paraId="080641D0"')
+req_tbl_start = data.find('<w:tbl>', req_seg_start)
+req_tbl_end = data.find('</w:tbl>', req_tbl_start) + len('</w:tbl>')
+req_segment = data[req_seg_start:req_tbl_end]
 
-def drop_last_cell(row_xml, label):
-    cells = re.findall(r'<w:tc>.*?</w:tc>', row_xml, re.S)
-    assert len(cells) == 5, f"{label}: expected 5 cells before dropping Datafix, got {len(cells)}"
-    last_cell = cells[-1]
-    assert row_xml.count(last_cell) == 1, f"{label}: last cell isn't uniquely identifiable"
-    return row_xml.replace(last_cell, '', 1)
-
-req_header = drop_last_cell(req_header, 'REQ header')
-req_row1 = drop_last_cell(req_row1, 'REQ row1')
-# Fold the dropped column's width into Summary (both header and prefix's
-# tblGrid need the same 4-column layout: 804/1497/6581/1044).
-req_prefix = req_prefix.replace(
-    '<w:tblGrid><w:gridCol w:w="804"/><w:gridCol w:w="1497"/><w:gridCol w:w="5563"/><w:gridCol w:w="1044"/><w:gridCol w:w="1018"/></w:tblGrid>',
-    '<w:tblGrid><w:gridCol w:w="804"/><w:gridCol w:w="1497"/><w:gridCol w:w="6581"/><w:gridCol w:w="1044"/></w:tblGrid>',
-    1,
-)
-req_header = req_header.replace('<w:tcW w:w="5563" w:type="dxa"/>', '<w:tcW w:w="6581" w:type="dxa"/>', 1)
-req_row1 = req_row1.replace('<w:tcW w:w="5563" w:type="dxa"/>', '<w:tcW w:w="6581" w:type="dxa"/>', 1)
-
+req_rows_found = re.findall(r'<w:tr .*?</w:tr>', req_segment, re.S)
+req_header, req_row1 = req_rows_found[0], req_rows_found[1]
 new_req_row = req_row1.replace('<w:t>1</w:t>', '<w:t>{{ROW_SLNO}}</w:t>', 1)
-new_req_row = new_req_row.replace('<w:t>TIC03-2170</w:t>', '<w:t>{{ROW_KEY}}</w:t>')
-new_req_row = new_req_row.replace('<w:t xml:space="preserve">Same-day exposure display incorrect - TIC03-2170</w:t>', '<w:t>{{ROW_SUMMARY}}</w:t>')
+new_req_row = new_req_row.replace('<w:t>TIC03-2220</w:t>', '<w:t>{{ROW_KEY}}</w:t>')
+new_req_row = new_req_row.replace(
+    '<w:t>Canned GL Account Detail report errors for Entity Type Asset Value Adjustment</w:t>',
+    '<w:t>{{ROW_SUMMARY}}</w:t>',
+)
 new_req_row = new_req_row.replace('<w:t>Critical</w:t>', '<w:t>{{ROW_PRIORITY}}</w:t>')
 for tok in ('{{ROW_SLNO}}', '{{ROW_KEY}}', '{{ROW_SUMMARY}}', '{{ROW_PRIORITY}}'):
     assert tok in new_req_row, f"REQ row: {tok} substitution silently no-op'd"
-assert '{{ROW_DATAFIX}}' not in new_req_row, "REQ row: Datafix column should have been dropped"
 new_req_row = re.sub(r'w14:paraId="([0-9A-Fa-f]{8})"', lambda m: 'w14:paraId="RQ' + m.group(1)[2:] + '"', new_req_row)
 templated_req_row = '<!--ROW:REQ-->' + new_req_row + '<!--/ROW:REQ-->'
-new_req_table = req_prefix + req_header + templated_req_row + '</w:tbl>'
-# Synthesize the intro bullet sentence to match the Tasks Completed / CDD style,
-# since Requirements has no such sentence in the source doc.
-req_bullet_para = '<w:p w14:paraId="62FB2610" w14:textId="0F9C7610" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:pPr><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000" w:themeColor="text1"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">Below requirements were released as part of CD {{CD_VERSION}} - </w:t></w:r></w:p>'
-# Matches the empty spacer paragraph that CDD/Tasks Completed retain naturally
-# from the source doc between their intro sentence and their table -- without
-# it, Requirements' table sits flush against the sentence while every other
-# section has a visible gap.
-req_spacer_para = '<w:p w14:paraId="62FB2611" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRPr="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:rPr><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr></w:pPr></w:p>'
-table_block = '<!--BLOCK:REQ:TABLE_START-->' + req_bullet_para + req_spacer_para + new_req_table + '<!--BLOCK:REQ:TABLE_END-->'
 
-req_na_para = '<w:p w14:paraId="146E8121" w14:textId="77777777" w:rsidR="00AD2C1D" w:rsidRDefault="00BE259B"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t></w:r></w:p>'
+req_bullet_end = req_segment.find('<w:tbl>')
+req_bullet_para = req_segment[:req_bullet_end]
+# Reduce "Below requirements are released as part of CD..." from 11pt to 10pt,
+# matching the same treatment CDD/Tasks Completed already get.
+assert req_bullet_para.count('<w:sz w:val="22"/>') == 2, "expected exactly 2 sz=22 runs in REQ bullet paragraph"
+req_bullet_para = req_bullet_para.replace('<w:sz w:val="22"/>', '<w:sz w:val="20"/>')
+# Shrink the blank spacer line before the table from its default ~10.5pt down
+# to 5pt, matching CDD/Tasks Completed.
+_req_spacer_old = '<w:p w14:paraId="381B3D2A" w14:textId="77777777" w:rsidR="005D08C4" w:rsidRPr="005D08C4" w:rsidRDefault="005D08C4" w:rsidP="005D08C4"/>'
+_req_spacer_new = '<w:p w14:paraId="381B3D2A" w14:textId="77777777" w:rsidR="005D08C4" w:rsidRPr="005D08C4" w:rsidRDefault="005D08C4" w:rsidP="005D08C4"><w:pPr><w:rPr><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr></w:pPr></w:p>'
+assert req_bullet_para.count(_req_spacer_old) == 1, "REQ spacer paragraph not found in expected form"
+req_bullet_para = req_bullet_para.replace(_req_spacer_old, _req_spacer_new)
+
+req_table_part = req_segment[req_bullet_end:]
+req_tbl_prefix = req_table_part[:req_table_part.find(req_header)]
+new_req_table = req_tbl_prefix + req_header + templated_req_row + '</w:tbl>'
+table_block = '<!--BLOCK:REQ:TABLE_START-->' + req_bullet_para + new_req_table + '<!--BLOCK:REQ:TABLE_END-->'
+# No naturally-occurring "NA" alternative for Requirements either (same as
+# CDD/Tasks) -- hand-authored, with a fresh paraId that doesn't collide.
+req_na_para = '<w:p w14:paraId="62FB2602" w14:textId="0F9C7602" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t></w:r></w:p>'
 na_block = '<!--BLOCK:REQ:NA_START-->' + req_na_para + '<!--BLOCK:REQ:NA_END-->'
-assert data.count(req_na_para) == 1
-data = data.replace(req_na_para, table_block + na_block)
+assert data.count(req_segment) == 1
+data = data.replace(req_segment, table_block + na_block)
 
 # ==== Migration / E2E (free text) ====
 one(
-    'w14:paraId="17A35AFF" w14:textId="56872CB9" w:rsidR="001C6D58" w:rsidRPr="004B4CA7" w:rsidRDefault="001C6D58" w:rsidP="008B34CA"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t>',
-    'w14:paraId="17A35AFF" w14:textId="56872CB9" w:rsidR="001C6D58" w:rsidRPr="004B4CA7" w:rsidRDefault="001C6D58" w:rsidP="008B34CA"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>{{MIGRATION_TEXT}}</w:t>',
+    'w14:paraId="17A35AFF" w14:textId="56872CB9" w:rsidR="001C6D58" w:rsidRPr="00972B98" w:rsidRDefault="001C6D58" w:rsidP="008B34CA"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>NA</w:t>',
+    'w14:paraId="17A35AFF" w14:textId="56872CB9" w:rsidR="001C6D58" w:rsidRPr="00972B98" w:rsidRDefault="001C6D58" w:rsidP="008B34CA"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>{{MIGRATION_TEXT}}</w:t>',
 )
 one(
-    'w14:paraId="5DBFEB03" w14:textId="77777777" w:rsidR="00553365" w:rsidRPr="004B4CA7" w:rsidRDefault="001C6D58" w:rsidP="004B4CA7"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>NA</w:t>',
-    'w14:paraId="5DBFEB03" w14:textId="77777777" w:rsidR="00553365" w:rsidRPr="004B4CA7" w:rsidRDefault="001C6D58" w:rsidP="004B4CA7"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>{{E2E_TEXT}}</w:t>',
+    'w14:paraId="5DBFEB03" w14:textId="77777777" w:rsidR="00553365" w:rsidRPr="00972B98" w:rsidRDefault="001C6D58" w:rsidP="004B4CA7"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>NA</w:t>',
+    'w14:paraId="5DBFEB03" w14:textId="77777777" w:rsidR="00553365" w:rsidRPr="00972B98" w:rsidRDefault="001C6D58" w:rsidP="004B4CA7"><w:pPr><w:ind w:left="720"/><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:pPr><w:r><w:rPr><w:color w:val="000000"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>{{E2E_TEXT}}</w:t>',
 )
 
 # ==== Tasks Completed (real table this time; needs a fabricated NA alternative) ====
@@ -187,7 +173,7 @@ tbl_start = data.find('<w:tbl>', tasks_seg_start)
 tbl_end = data.find('</w:tbl>', tbl_start) + len('</w:tbl>')
 tasks_segment = data[tasks_seg_start:tbl_end]
 rows = re.findall(r'<w:tr .*?</w:tr>', tasks_segment, re.S)
-assert len(rows) == 9, f"expected header+8 rows, got {len(rows)}"
+assert len(rows) == 4, f"expected header+3 rows, got {len(rows)}"
 header, row1 = rows[0], rows[1]
 new_row = row1.replace('<w:t>1</w:t>', '<w:t>{{ROW_SLNO}}</w:t>', 1)
 new_row = new_row.replace('<w:t>TIC03-2220</w:t>', '<w:t>{{ROW_KEY}}</w:t>')
@@ -310,19 +296,36 @@ for old_h in biz_heights_old:
 assert data.count(biz_table) == 1
 data = data.replace(biz_table, new_biz_table)
 
-# --- Requirements / Code Drop Defects: already share identical column widths
-# (REQ was cloned from CDD's structure) and just need the font/size fix, plus
-# the same row-height standardization as the other two tables.
-for marker, label in [('BLOCK:REQ:TABLE_START', 'Requirements'), ('BLOCK:CDD:TABLE_START', 'CDD')]:
-    t = get_table(marker)
-    new_t = normalize_table_font(t, label)
-    assert new_t != t, f"{label}: expected font/size normalization to change something"
-    for old_h in ('331', '183'):
-        n = new_t.count(f'<w:trHeight w:val="{old_h}"/>')
-        assert n == 1, f"{label}: trHeight {old_h} not found exactly once, got {n}"
-        new_t = new_t.replace(f'<w:trHeight w:val="{old_h}"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
-    assert data.count(t) == 1
-    data = data.replace(t, new_t)
+# --- Code Drop Defects: just needs the font/size fix plus the shared
+# row-height standardization used by every ticket table.
+t = get_table('BLOCK:CDD:TABLE_START')
+new_t = normalize_table_font(t, 'CDD')
+assert new_t != t, "CDD: expected font/size normalization to change something"
+for old_h in ('331', '183'):
+    n = new_t.count(f'<w:trHeight w:val="{old_h}"/>')
+    assert n == 1, f"CDD: trHeight {old_h} not found exactly once, got {n}"
+    new_t = new_t.replace(f'<w:trHeight w:val="{old_h}"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
+assert data.count(t) == 1
+data = data.replace(t, new_t)
+
+# --- Requirements: has its own genuine example table now (not cloned from
+# CDD), authored independently with its own column widths/row heights, so it
+# needs the same kind of dedicated width-rebalance Tasks Completed needed.
+req_table = get_table('BLOCK:REQ:TABLE_START')
+new_req_table2 = normalize_table_font(req_table, 'Requirements')
+req_widths_old = ['666', '1314', '6662', '1276']
+req_widths_new = ['804', '1497', '6581', '1044']  # matches the 4-col standard (no Datafix)
+for old_w, new_w in zip(req_widths_old, req_widths_new):
+    n = new_req_table2.count(f'w:w="{old_w}"')
+    assert n >= 1, f"Requirements: width {old_w} not found"
+    new_req_table2 = new_req_table2.replace(f'w:w="{old_w}"', f'w:w="{new_w}"')
+req_heights_old = ['277', '608']
+for old_h in req_heights_old:
+    n = new_req_table2.count(f'<w:trHeight w:val="{old_h}"/>')
+    assert n == 1, f"Requirements: trHeight {old_h} not found exactly once, got {n}"
+    new_req_table2 = new_req_table2.replace(f'<w:trHeight w:val="{old_h}"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
+assert data.count(req_table) == 1
+data = data.replace(req_table, new_req_table2)
 
 # --- Tasks Completed: needs font/size fix AND a column-width rebalance to
 # match Requirements/CDD's proportions (its table was authored separately
@@ -373,107 +376,41 @@ assert data.count(tasks_table) == 1
 data = data.replace(tasks_table, new_tasks_table)
 
 # --- Header color: the Release Request Packages and Environment Summary
-# tables' headers reference a theme color (accent1) that resolves to a
-# visibly different, lighter blue than the literal navy every other table
-# header uses. Pin both to the same literal color for a consistent look.
-_old_header_fill = '<w:shd w:val="clear" w:color="auto" w:fill="156082" w:themeFill="accent1"/>'
-_new_header_fill = '<w:shd w:val="clear" w:color="auto" w:fill="104861"/>'
-n_header_fill = data.count(_old_header_fill)
-assert n_header_fill == 8, f"expected 8 occurrences (RRP + Environment Summary headers), got {n_header_fill}"
-data = data.replace(_old_header_fill, _new_header_fill)
+# tables' headers used to reference a theme color (accent1) that resolved to
+# a visibly different, lighter blue than the literal navy every other table
+# header uses. The base doc now ships with the literal navy already applied
+# everywhere, so this is just a defensive check that it stays that way rather
+# than an active fix.
+assert data.count('w:fill="156082" w:themeFill="accent1"') == 0, \
+    "found theme-colored header fill(s) that should be literal navy -- base doc may have reverted"
 
 # ==== Environment Summary table column widths ====
-# Requested: first column (Environment) = 2.2cm, all other columns
-# (Core / Partner Portal / Customer Portal / API) = 4cm each.
+# The user's latest base doc has its own finalized column widths, row
+# heights, and cell padding for this table -- those are trusted as-is now
+# rather than overridden. The one thing still worth fixing structurally
+# (not visually) is that this table is uniquely set up with floating/
+# anchored positioning (tblpPr, absolute vertical offset from its anchor
+# paragraph) rather than normal inline flow. That's fragile: any upstream
+# change that shifts pagination can make the "Environment Summary" heading
+# itself render beside the table instead of above it, since the table no
+# longer reliably tracks the heading's actual position. Converting it to a
+# plain inline table (like every other table here) makes it immune to this
+# class of bug regardless of what else changes upstream.
 _es_idx1 = data.find('Environment Summary')
 _es_idx2 = data.find('Environment Summary', _es_idx1 + 1)
 _es_tbl_start = data.find('<w:tbl>', _es_idx2)
 _es_tbl_end = data.find('</w:tbl>', _es_tbl_start) + len('</w:tbl>')
 es_table = data[_es_tbl_start:_es_tbl_end]
-# This table is (uniquely, among every table in the document) set up with
-# floating/anchored positioning (tblpPr, absolute vertical offset from its
-# anchor paragraph) rather than normal inline flow. That's fragile: any
-# upstream change that shifts pagination -- like the heading font-size
-# change earlier this round -- can make the "Environment Summary" heading
-# itself render beside the table instead of above it, since the table no
-# longer reliably tracks the heading's actual position. Converting it to a
-# plain inline table (like every other table here) makes it immune to this
-# class of bug regardless of what else changes upstream.
 _es_floating_props = '<w:tblpPr w:leftFromText="180" w:rightFromText="180" w:vertAnchor="text" w:horzAnchor="margin" w:tblpXSpec="center" w:tblpY="164"/>'
 assert es_table.count(_es_floating_props) == 1, "Environment Summary: floating tblpPr not found"
-es_table_inline = es_table.replace(_es_floating_props, '')
-FIRST_COL_DXA = round(2.2 * 1440 / 2.54)   # 2.2cm -> 1247 dxa
-OTHER_COL_DXA = round(4 * 1440 / 2.54)     # 4cm   -> 2268 dxa
-n_first = es_table_inline.count('w:w="1408"')
-n_other = es_table_inline.count('w:w="2551"')
-assert n_first == 5, f"expected 5 occurrences (1 gridCol + 4 rows) of the first column width, got {n_first}"
-assert n_other == 20, f"expected 20 occurrences (4 gridCol + 4 rows x 4 cols) of the other column width, got {n_other}"
-new_es_table = es_table_inline.replace('w:w="1408"', f'w:w="{FIRST_COL_DXA}"').replace('w:w="2551"', f'w:w="{OTHER_COL_DXA}"')
-new_total = FIRST_COL_DXA + 4 * OTHER_COL_DXA
-new_es_table = new_es_table.replace('<w:tblW w:w="11612" w:type="dxa"/>', f'<w:tblW w:w="{new_total}" w:type="dxa"/>', 1)
-# Header row height (188 dxa) didn't match the 227 dxa (0.4cm) standard used
-# for every other table's header/single-line rows. The data rows (Staging/
-# UAT/Production) genuinely need more height to fit their wrapped 2-line
-# URLs, so only the header row is touched here.
-assert new_es_table.count('<w:trHeight w:val="188"/>') == 1, "Environment Summary: header trHeight not found"
-new_es_table = new_es_table.replace('<w:trHeight w:val="188"/>', f'<w:trHeight w:val="{SINGLE_LINE_ROW_HEIGHT}"/>')
-# The header row's cells also carry explicit top/bottom padding (80 dxa each)
-# that none of the ticket tables' headers have -- that padding adds directly
-# to the rendered row height regardless of trHeight, so setting trHeight
-# alone wasn't enough to make it visually match. Scoped to just the header
-# row (not the data rows, which keep their padding for the wrapped URLs).
-es_rows = re.findall(r'<w:tr .*?</w:tr>', new_es_table, re.S)
-es_header = es_rows[0]
-_es_header_padded_tcmar = '<w:tcMar><w:top w:w="80" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>'
-_es_header_flat_tcmar = '<w:tcMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tcMar>'
-n_es_header_tcmar = es_header.count(_es_header_padded_tcmar)
-assert n_es_header_tcmar == 5, f"Environment Summary header: expected 5 padded tcMar cells, got {n_es_header_tcmar}"
-new_es_header = es_header.replace(_es_header_padded_tcmar, _es_header_flat_tcmar)
-assert new_es_table.count(es_header) == 1
-new_es_table = new_es_table.replace(es_header, new_es_header)
+new_es_table = es_table.replace(_es_floating_props, '')
 assert data.count(es_table) == 1
 data = data.replace(es_table, new_es_table)
 
-# ==== Document Revision History table: drop named style, go fully explicit ====
-# This table is the only one in the document that relies on a named Word
-# table style ("ListTable4-Accent4") instead of fully explicit, self-contained
-# formatting like every other table here. That's not just a cosmetic
-# difference -- Word's own conditional "first row" style formatting appears to
-# take priority over inline cell shading for this style family in practice,
-# so simply adding inline w:shd to the header cells (tried first) rendered
-# correctly in LibreOffice but NOT in real Microsoft Word. Removing the style
-# reference entirely and giving it the same explicit tblBorders every other
-# table uses sidesteps that precedence question altogether -- there's no
-# style left to compete with the inline formatting.
-_drh_idx1 = data.find('Document Revision History')
-_drh_idx2 = data.find('Document Revision History', _drh_idx1 + 1)
-_drh_tbl_start = data.find('<w:tbl>', _drh_idx2)
-_drh_tbl_end = data.find('</w:tbl>', _drh_tbl_start) + len('</w:tbl>')
-drh_table = data[_drh_tbl_start:_drh_tbl_end]
-
-_drh_old_tblpr = '<w:tblPr><w:tblStyle w:val="ListTable4-Accent4"/><w:tblW w:w="5000" w:type="pct"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>'
-_drh_new_tblpr = '<w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="6" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="6" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="6" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="6" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="6" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="6" w:space="0" w:color="auto"/></w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>'
-assert drh_table.count(_drh_old_tblpr) == 1, "Document Revision History: tblPr not found in expected form"
-new_drh_table = drh_table.replace(_drh_old_tblpr, _drh_new_tblpr)
-
-drh_rows = re.findall(r'<w:tr .*?</w:tr>', new_drh_table, re.S)
-drh_header = drh_rows[0]
-drh_header_cells_old = [
-    '<w:tcPr><w:cnfStyle w:val="001000000000" w:firstRow="0" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:oddVBand="0" w:evenVBand="0" w:oddHBand="0" w:evenHBand="0" w:firstRowFirstColumn="0" w:firstRowLastColumn="0" w:lastRowFirstColumn="0" w:lastRowLastColumn="0"/><w:tcW w:w="1000" w:type="pct"/></w:tcPr>',
-    '<w:tcPr><w:tcW w:w="2000" w:type="pct"/></w:tcPr>',
-    '<w:tcPr><w:tcW w:w="579" w:type="pct"/></w:tcPr>',
-    '<w:tcPr><w:tcW w:w="1421" w:type="pct"/></w:tcPr>',
-]
-new_drh_header = drh_header
-for old_cell in drh_header_cells_old:
-    n = new_drh_header.count(old_cell)
-    assert n == 1, f"Document Revision History header: expected 1 occurrence of {old_cell[:50]!r}, got {n}"
-    new_cell = old_cell.replace('</w:tcPr>', '<w:shd w:val="clear" w:color="auto" w:fill="104861"/></w:tcPr>')
-    new_drh_header = new_drh_header.replace(old_cell, new_cell)
-assert new_drh_table.count(drh_header) == 1
-new_drh_table = new_drh_table.replace(drh_header, new_drh_header)
-assert data.count(drh_table) == 1
-data = data.replace(drh_table, new_drh_table)
+# ==== Document Revision History table ====
+# Previously needed fixing (named style overriding inline header shading),
+# but the base doc now ships with a plain "TableGrid" style plus explicit
+# per-cell header shading already applied -- nothing left to do here.
 
 # ==== Decorative graphics: wrapThrough -> wrapNone ====
 # Two cover-page decorative elements ("Group 7" and "Picture 4" -- the logo
@@ -496,21 +433,12 @@ for _old_wrap in _wrap_matches:
     data = data.replace(_old_wrap, '<wp:wrapNone/>')
 
 # ==== Breathing room before "Environment Summary" ====
-# It currently sits flush against the bottom border of the Release Details
-# table with no gap at all, which reads as congested. Neither a lone spacer
-# paragraph nor a lone space-before override produced a strongly visible
-# gap on their own (paragraph-after-a-table spacing behaves differently
-# from paragraph-after-paragraph spacing) -- combining both stacks the
-# effect into something actually visible.
-_es_heading_anchor = '</w:tbl><w:p w14:paraId="02C7775B"'
-assert data.count(_es_heading_anchor) == 1, "Environment Summary heading anchor not found"
-_es_spacer_para = '<w:p w14:paraId="62FB2612" w14:textId="77777777" w:rsidR="001C6D58" w:rsidRDefault="001C6D58"><w:r><w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r></w:p>'
-data = data.replace(_es_heading_anchor, '</w:tbl>' + _es_spacer_para + '<w:p w14:paraId="02C7775B"', 1)
+# Previously needed fixing (it sat flush against the table above with no
+# gap), but the base doc now has its own fix for this baked in (two empty
+# Heading2-styled paragraphs inserted before the heading) -- nothing left
+# to do here.
 
-_es_heading_pPr_old = '<w:p w14:paraId="02C7775B" w14:textId="5CAF30A1" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:pStyle w:val="Heading2"/><w:rPr><w:lang w:eastAsia="en-IN" w:bidi="ar-SA"/></w:rPr></w:pPr>'
-_es_heading_pPr_new = '<w:p w14:paraId="02C7775B" w14:textId="5CAF30A1" w:rsidR="001C6D58" w:rsidRDefault="001C6D58" w:rsidP="001C6D58"><w:pPr><w:pStyle w:val="Heading2"/><w:spacing w:before="480"/><w:rPr><w:lang w:eastAsia="en-IN" w:bidi="ar-SA"/></w:rPr></w:pPr>'
-assert data.count(_es_heading_pPr_old) == 1, "Environment Summary heading pPr not found"
-data = data.replace(_es_heading_pPr_old, _es_heading_pPr_new, 1)
+
 
 open(path, 'w', encoding='utf-8').write(data)
 print("Templatization complete. Length:", len(data))
