@@ -113,16 +113,41 @@ data = data.replace(cdd_segment, table_block + na_block)
 # Priority/Datafix -- confirmed against app.js SECTION_CONFIG) and re-minting
 # fresh paraIds so they don't collide with the CDD copy. The genuine NA
 # paragraph in this doc becomes the real BLOCK:REQ:NA_START content.
+#
+# Requirements doesn't need a Datafix column (per request), so after cloning
+# CDD's 5-column structure, the 5th column is dropped from both the header
+# and the row template, and its width (1018 dxa) is folded into Summary so
+# the table still totals 9926 dxa, matching every other ticket table.
 req_rows = re.findall(r'<w:tr .*?</w:tr>', cdd_source_table, re.S)
 req_header, req_row1 = req_rows[0], req_rows[1]
 req_prefix = cdd_source_table[:cdd_source_table.find(req_header)]
+
+def drop_last_cell(row_xml, label):
+    cells = re.findall(r'<w:tc>.*?</w:tc>', row_xml, re.S)
+    assert len(cells) == 5, f"{label}: expected 5 cells before dropping Datafix, got {len(cells)}"
+    last_cell = cells[-1]
+    assert row_xml.count(last_cell) == 1, f"{label}: last cell isn't uniquely identifiable"
+    return row_xml.replace(last_cell, '', 1)
+
+req_header = drop_last_cell(req_header, 'REQ header')
+req_row1 = drop_last_cell(req_row1, 'REQ row1')
+# Fold the dropped column's width into Summary (both header and prefix's
+# tblGrid need the same 4-column layout: 804/1497/6581/1044).
+req_prefix = req_prefix.replace(
+    '<w:tblGrid><w:gridCol w:w="804"/><w:gridCol w:w="1497"/><w:gridCol w:w="5563"/><w:gridCol w:w="1044"/><w:gridCol w:w="1018"/></w:tblGrid>',
+    '<w:tblGrid><w:gridCol w:w="804"/><w:gridCol w:w="1497"/><w:gridCol w:w="6581"/><w:gridCol w:w="1044"/></w:tblGrid>',
+    1,
+)
+req_header = req_header.replace('<w:tcW w:w="5563" w:type="dxa"/>', '<w:tcW w:w="6581" w:type="dxa"/>', 1)
+req_row1 = req_row1.replace('<w:tcW w:w="5563" w:type="dxa"/>', '<w:tcW w:w="6581" w:type="dxa"/>', 1)
+
 new_req_row = req_row1.replace('<w:t>1</w:t>', '<w:t>{{ROW_SLNO}}</w:t>', 1)
 new_req_row = new_req_row.replace('<w:t>TIC03-2170</w:t>', '<w:t>{{ROW_KEY}}</w:t>')
 new_req_row = new_req_row.replace('<w:t xml:space="preserve">Same-day exposure display incorrect - TIC03-2170</w:t>', '<w:t>{{ROW_SUMMARY}}</w:t>')
 new_req_row = new_req_row.replace('<w:t>Critical</w:t>', '<w:t>{{ROW_PRIORITY}}</w:t>')
-new_req_row = re.sub(r'<w:t>No</w:t></w:r></w:p></w:tc></w:tr>$', '<w:t>{{ROW_DATAFIX}}</w:t></w:r></w:p></w:tc></w:tr>', new_req_row)
-for tok in ('{{ROW_SLNO}}', '{{ROW_KEY}}', '{{ROW_SUMMARY}}', '{{ROW_PRIORITY}}', '{{ROW_DATAFIX}}'):
+for tok in ('{{ROW_SLNO}}', '{{ROW_KEY}}', '{{ROW_SUMMARY}}', '{{ROW_PRIORITY}}'):
     assert tok in new_req_row, f"REQ row: {tok} substitution silently no-op'd"
+assert '{{ROW_DATAFIX}}' not in new_req_row, "REQ row: Datafix column should have been dropped"
 new_req_row = re.sub(r'w14:paraId="([0-9A-Fa-f]{8})"', lambda m: 'w14:paraId="RQ' + m.group(1)[2:] + '"', new_req_row)
 templated_req_row = '<!--ROW:REQ-->' + new_req_row + '<!--/ROW:REQ-->'
 new_req_table = req_prefix + req_header + templated_req_row + '</w:tbl>'

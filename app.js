@@ -3,7 +3,7 @@
 // Bump this whenever assets/master_template.docx changes -- without it,
 // a browser or CDN cache can keep serving a stale template indefinitely,
 // since (unlike the CSS/JS below) this file was never cache-busted before.
-const TEMPLATE_VERSION = 9;
+const TEMPLATE_VERSION = 10;
 const TEMPLATE_URL = `assets/master_template.docx?v=${TEMPLATE_VERSION}`;
 
 const SITES = ["Core", "Partner Portal", "Customer Portal"];
@@ -24,7 +24,7 @@ const RRP_PACKAGES = [
 
 const SECTION_CONFIG = {
   bizconfig: { rowFields: ["key", "summary", "type"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", type: "ROW_TYPE" } },
-  req:       { rowFields: ["key", "summary", "priority", "datafix"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY", datafix: "ROW_DATAFIX" } },
+  req:       { rowFields: ["key", "summary", "priority"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY" } },
   tasks:     { rowFields: ["key", "summary", "priority", "datafix"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY", datafix: "ROW_DATAFIX" } },
   cdd:       { rowFields: ["key", "summary", "priority", "datafix"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY", datafix: "ROW_DATAFIX" } },
 };
