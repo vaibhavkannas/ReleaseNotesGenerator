@@ -365,9 +365,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // covers general form typing.
   document.getElementById("generateTsrCheckbox").addEventListener("change", renderTsrTotalsPreview);
 
-  // Offer to restore an autosaved draft, if one exists
+  // Offer to restore an autosaved draft, but only if there's genuinely
+  // something in it worth restoring -- also cleans up a stale trivial
+  // autosave that may have been written before this check existed.
   const saved = Store.get(AUTOSAVE_KEY);
-  if (saved) showRestoreBanner(saved);
+  if (saved) {
+    let parsedSaved = null;
+    try { parsedSaved = JSON.parse(saved); } catch (e) { /* malformed, treat as nothing to restore */ }
+    if (parsedSaved && isFormStateMeaningful(parsedSaved)) {
+      showRestoreBanner(saved);
+    } else {
+      Store.remove(AUTOSAVE_KEY);
+    }
+  }
 
   renderSummary();
   renderTsrTotalsPreview();
@@ -447,9 +457,53 @@ function renderTsrTotalsPreview() {
   `;
 }
 
+// Guards against offering to "restore" a session that never had anything
+// worth restoring in the first place. Without this, merely clicking
+// anywhere on the page (content's click listener debounces into
+// autosaveDraft() unconditionally) persists a snapshot -- so someone who
+// just opened the app, poked around, and left would see "We found an
+// autosaved draft" on their next visit even though nothing was ever
+// actually entered. Release date is deliberately excluded here since it's
+// now defaulted to today on every fresh load regardless of any real input.
+function isFormStateMeaningful(state) {
+  if (!state) return false;
+  const sections = state.sections || {};
+  if (Object.values(sections).some(rows => Array.isArray(rows) && rows.length > 0)) return true;
+  const siteDetails = state.siteDetails || {};
+  for (const site of Object.keys(siteDetails)) {
+    const d = siteDetails[site] || {};
+    if (d.cdVersionRaw || d.productVersion || d.fxVersion) return true;
+    if (d.pasteText && d.pasteText.trim() && d.pasteText.trim() !== pasteDetailsPlaceholderText()) return true;
+    if (d.rrp && Object.values(d.rrp).some(v => v === "Yes")) return true;
+  }
+  if ((state.migrationText || "").trim()) return true;
+  if ((state.e2eText || "").trim()) return true;
+  if ((state.appSettingsText || "").trim()) return true;
+  if ((state.webConfigText || "").trim()) return true;
+  if (Array.isArray(state.pasteGridRows) && state.pasteGridRows.some(row => Array.isArray(row) && row.some(cell => (cell || "").trim()))) return true;
+  return false;
+}
+
+// Clicking into an empty "paste release details" box auto-inserts its own
+// placeholder text as real, editable content (see the focus handler in
+// buildSiteDetailCards) -- without this, that auto-inserted template text
+// would itself count as "the user entered something," defeating the whole
+// point of this check. All 3 site cards share the same placeholder text, so
+// any one of them is representative.
+function pasteDetailsPlaceholderText() {
+  const el = document.querySelector("[data-paste-details]");
+  return el ? el.placeholder.replace(/\r/g, "").trim() : "";
+}
+
 function autosaveDraft() {
   try {
-    Store.set(AUTOSAVE_KEY, JSON.stringify(serializeFormState()));
+    const state = serializeFormState();
+    // Skip the write (not just the later restore-banner check) so an
+    // earlier genuinely meaningful autosave doesn't get silently
+    // overwritten by a momentarily-trivial state -- e.g. right after
+    // clearing tickets but before anything new is entered.
+    if (!isFormStateMeaningful(state)) return;
+    Store.set(AUTOSAVE_KEY, JSON.stringify(state));
   } catch (e) { /* non-fatal */ }
 }
 
