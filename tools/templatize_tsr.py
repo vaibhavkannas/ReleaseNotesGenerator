@@ -114,6 +114,20 @@ _old_shape_style = 'style="width:68.8pt;height:44.65pt"'
 _new_shape_style = 'style="width:117.35pt;height:75pt"'
 assert data.count(_old_shape_style) == 1, "OLE icon shape style not found in expected form"
 data = data.replace(_old_shape_style, _new_shape_style)
+
+# w:object's dxaOrig/dyaOrig (twentieths-of-a-point) are a THIRD, separate
+# size specification -- the object's "original size" baseline -- distinct
+# from both the v:shape style above and the icon image's own DPI metadata.
+# Previously left at the stale original values (1376/893 dxa = 68.8/44.65pt)
+# while only the v:shape style was resized, creating an inconsistency
+# between the two that most likely explains why the icon still resized
+# (if inconsistently) even after fixing DPI and oleSize: Word's OLE-refresh
+# logic appears to reference this baseline too. Updated to agree with the
+# same 117.35pt x 75pt target as everything else.
+_old_dxa_dya = 'w:dxaOrig="1376" w:dyaOrig="893"'
+_new_dxa_dya = 'w:dxaOrig="2347" w:dyaOrig="1500"'
+assert data.count(_old_dxa_dya) == 1, "OLE object dxaOrig/dyaOrig not found in expected form"
+data = data.replace(_old_dxa_dya, _new_dxa_dya)
 open(path, 'w', encoding='utf-8').write(data)
 
 rels_path = 'unpacked/word/_rels/document.xml.rels'
