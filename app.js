@@ -1587,6 +1587,23 @@ async function onGenerate() {
     siteValuesMap[site] = v;
   }
 
+  // A mismatched release date across sites is usually a mistake (forgot to
+  // update one site after copying values from another), but occasionally
+  // genuinely intentional (staggered rollout). Since this app defaults every
+  // site's date to today, this is the main way a stale leftover value on an
+  // untouched site would otherwise go unnoticed until after the docx is
+  // already generated and shared.
+  if (sites.length > 1) {
+    const uniqueDates = [...new Set(sites.map(s => siteValuesMap[s].releaseDateIso))];
+    if (uniqueDates.length > 1) {
+      const details = sites.map(s => `${s}: ${formatDateLong(siteValuesMap[s].releaseDateIso)}`).join("\n");
+      const proceed = confirm(
+        `Release dates don't match across the selected sites:\n\n${details}\n\nIf this is intentional (e.g. a staggered rollout), continue. Otherwise, cancel and fix the date(s) first.`
+      );
+      if (!proceed) return;
+    }
+  }
+
   const globalValues = {
     migrationText: document.getElementById("migrationText").value.trim(),
     e2eText: document.getElementById("e2eText").value.trim(),
