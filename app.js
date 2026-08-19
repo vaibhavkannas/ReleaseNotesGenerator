@@ -1013,6 +1013,25 @@ function splitVersion(full) {
   return { full, cd: full.substring(firstDot + 1) };
 }
 
+// The "Release/CodeDrop version" field is free text with no format
+// constraint, but its value flows directly into generated filenames and
+// (for the TSR) an Excel sheet name -- both of which have real character
+// restrictions. An unusual value (a stray "/", for instance) could
+// otherwise produce a file the OS refuses to save, or a workbook Excel
+// refuses to open, with no warning until the person tries to open it.
+function sanitizeForFilename(str) {
+  const cleaned = String(str).replace(/[\\/:*?"<>|]/g, "-").trim();
+  return cleaned || "untitled";
+}
+
+// Excel sheet names specifically: no \ / ? * [ ] : , max 31 characters,
+// can't be blank, can't start or end with an apostrophe.
+function sanitizeForSheetName(str) {
+  let cleaned = String(str).replace(/[\\/?*[\]:]/g, "-").trim();
+  cleaned = cleaned.replace(/^'+|'+$/g, "");
+  return cleaned || "Sheet1";
+}
+
 function xmlEscape(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -1116,11 +1135,13 @@ async function buildDocxForSite(templateArrayBuffer, site, sections, siteValues,
   });
 
   const remaining = xml.match(/\{\{[A-Z_]+\}\}/g);
-  if (remaining) console.warn("Unresolved tokens:", [...new Set(remaining)]);
+  const unresolvedTokens = remaining ? [...new Set(remaining)] : [];
+  if (unresolvedTokens.length) console.warn("Unresolved tokens:", unresolvedTokens);
 
   zip.file(docPath, xml);
   const rawBlob = await zip.generateAsync({ type: "blob" });
-  return new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  const blob = new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  return { blob, unresolvedTokens };
 }
 
 // ---------- Test Summary Report (TSR) generation ----------
@@ -1403,13 +1424,14 @@ async function buildTsrDocx(templateArrayBuffer, tickets, releaseVersion, releas
 
   const finalDocXml = await zip.file("word/document.xml").async("string");
   const remaining = finalDocXml.match(/\{\{[A-Z_]+\}\}/g);
-  if (remaining) console.warn("TSR: unresolved tokens:", [...new Set(remaining)]);
+  const unresolvedTokens = remaining ? [...new Set(remaining)] : [];
+  if (unresolvedTokens.length) console.warn("TSR: unresolved tokens:", unresolvedTokens);
 
   const embedName = Object.keys(zip.files).find(n => /^word\/embeddings\/Odessa_Test_Summary_Report.*\.xlsx$/.test(n));
   if (!embedName) throw new Error("TSR template: embedded Excel placeholder not found. The template may be corrupted.");
   const embeddedBytes = await zip.file(embedName).async("uint8array");
 
-  const sheetName = `PI${releaseVersion}`;
+  const sheetName = sanitizeForSheetName(`PI${releaseVersion}`).slice(0, 31);
   const xlsxTitle = `Odessa_Test_Summary_Report_${releaseVersion}`;
   const newXlsxBytes = await buildTsrExcelBytes(embeddedBytes, tickets, sheetName, xlsxTitle);
 
@@ -1433,7 +1455,8 @@ async function buildTsrDocx(templateArrayBuffer, tickets, releaseVersion, releas
   }
 
   const rawBlob = await zip.generateAsync({ type: "blob" });
-  return new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  const blob = new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  return { blob, unresolvedTokens };
 }
 
 // ---------- Generate ----------
@@ -1494,10 +1517,12 @@ async function onGenerate() {
     }
     const templateBuffer = uploadedTemplateBuffer || await templateResp.arrayBuffer();
     const files = [];
+    const allUnresolvedTokens = new Set();
 
     for (const site of sites) {
-      const blob = await buildDocxForSite(templateBuffer, site, sections, siteValuesMap[site], globalValues);
-      const cdVersion = splitVersion(siteValuesMap[site].cdVersionRaw).cd;
+      const { blob, unresolvedTokens } = await buildDocxForSite(templateBuffer, site, sections, siteValuesMap[site], globalValues);
+      unresolvedTokens.forEach(t => allUnresolvedTokens.add(t));
+      const cdVersion = sanitizeForFilename(splitVersion(siteValuesMap[site].cdVersionRaw).cd);
       const filename = `FOCUS Code Drop ${cdVersion} Release Notes ${site}.docx`;
       files.push({ site, filename, blob });
     }
@@ -1515,14 +1540,15 @@ async function onGenerate() {
         // selected site's version/date -- same values already validated above.
         const primarySite = sites[0];
         const primaryValues = siteValuesMap[primarySite];
-        const tsrVersion = splitVersion(primaryValues.cdVersionRaw).cd;
+        const tsrVersion = sanitizeForFilename(splitVersion(primaryValues.cdVersionRaw).cd);
         const tickets = collectAllTicketsForTsr();
         const tsrResp = await fetch(TSR_TEMPLATE_URL);
         if (!tsrResp.ok) {
           throw new Error(`Could not load the Test Summary Report template (HTTP ${tsrResp.status}).`);
         }
         const tsrTemplateBuffer = await tsrResp.arrayBuffer();
-        const tsrBlob = await buildTsrDocx(tsrTemplateBuffer, tickets, tsrVersion, primaryValues.releaseDateIso);
+        const { blob: tsrBlob, unresolvedTokens: tsrUnresolvedTokens } = await buildTsrDocx(tsrTemplateBuffer, tickets, tsrVersion, primaryValues.releaseDateIso);
+        tsrUnresolvedTokens.forEach(t => allUnresolvedTokens.add(t));
         files.push({ site: null, filename: `Odessa_Test_Summary_Report_${tsrVersion}.docx`, blob: tsrBlob });
       } catch (tsrErr) {
         console.error(tsrErr);
@@ -1532,9 +1558,20 @@ async function onGenerate() {
 
     lastGeneratedFiles = files;
     renderGeneratedFilesPanel(files);
+    // Unresolved tokens mean the underlying template (almost always a
+    // custom-uploaded one) doesn't fully match what this app expects -- the
+    // file is still generated and downloadable, but will have literal
+    // "{{TOKEN}}" text visible somewhere. Surfacing this beats a silent
+    // console.warn nobody but a developer would ever see.
+    const tokenWarning = allUnresolvedTokens.size
+      ? ` ${allUnresolvedTokens.size} template placeholder(s) didn't get filled in (${[...allUnresolvedTokens].join(", ")}) — the uploaded template may not fully match this app's expected format.`
+      : "";
     if (tsrWarning) {
       statusEl.className = "status-msg error";
-      statusEl.textContent = `Release Notes ready below, but the Test Summary Report failed: ${tsrWarning}`;
+      statusEl.textContent = `Release Notes ready below, but the Test Summary Report failed: ${tsrWarning}${tokenWarning}`;
+    } else if (tokenWarning) {
+      statusEl.className = "status-msg error";
+      statusEl.textContent = `Ready — ${files.length} file${files.length > 1 ? "s" : ""} generated below, but check them over:${tokenWarning}`;
     } else {
       statusEl.className = "status-msg ok";
       statusEl.textContent = `Ready — ${files.length} file${files.length > 1 ? "s" : ""} generated below.`;
@@ -1838,7 +1875,7 @@ function restoreFormState(state) {
 function onSaveDraft() {
   const state = serializeFormState();
   const firstSite = state.sites[0];
-  const version = (firstSite && state.siteDetails[firstSite] && state.siteDetails[firstSite].cdVersionRaw) || "draft";
+  const version = sanitizeForFilename((firstSite && state.siteDetails[firstSite] && state.siteDetails[firstSite].cdVersionRaw) || "draft");
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   saveAs(blob, `Release Notes Draft ${version}.json`);
 }
