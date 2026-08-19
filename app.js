@@ -848,6 +848,17 @@ function collectAllExistingKeys() {
   return keys;
 }
 
+function findExistingRowByKey(normKey) {
+  for (const sec of Object.keys(SECTION_CONFIG)) {
+    const rows = document.querySelectorAll(`#${sec}-rows .ticket-row`);
+    for (const rowEl of rows) {
+      const input = rowEl.querySelector('[data-field="key"]');
+      if (input && input.value.trim().toUpperCase() === normKey) return rowEl;
+    }
+  }
+  return null;
+}
+
 function onParseTickets() {
   const statusEl = document.getElementById("pasteStatus");
   if (!gridHasContent()) {
@@ -873,11 +884,30 @@ function onParseTickets() {
   const existingKeys = collectAllExistingKeys();
   const seenInBatch = new Set();
   const skipped = [];
+  let backfilled = 0;
   const counts = { bizconfig: 0, req: 0, tasks: 0, cdd: 0 };
   records.forEach(rec => {
     const normKey = (rec.key || "").trim().toUpperCase();
     if (normKey && (existingKeys.has(normKey) || seenInBatch.has(normKey))) {
       skipped.push(rec.key);
+      // The ticket itself already exists (by key), so it's not re-added --
+      // but if this paste is carrying test-case data for it (e.g. someone
+      // parsed once without test-case numbers, then went back and filled
+      // them into the grid for the same tickets), that data would otherwise
+      // silently vanish. Backfill just the TSR fields on the existing row,
+      // only where the incoming value is non-blank, so already-entered
+      // Release Notes fields are never touched or clobbered by a stale paste.
+      const existingRow = findExistingRowByKey(normKey);
+      if (existingRow) {
+        let rowChanged = false;
+        TSR_EXTRA_FIELDS.forEach(f => {
+          const incoming = rec[f];
+          if (incoming === undefined || incoming === "") return;
+          const input = existingRow.querySelector(`[data-field="${f}"]`);
+          if (input) { input.value = incoming; rowChanged = true; }
+        });
+        if (rowChanged) backfilled++;
+      }
       return;
     }
     if (normKey) seenInBatch.add(normKey);
@@ -886,7 +916,10 @@ function onParseTickets() {
   });
   const addedTotal = records.length - skipped.length;
   let msg = `Added ${addedTotal} ticket(s): ${counts.bizconfig} Business Config, ${counts.req} Requirements, ${counts.tasks} Tasks, ${counts.cdd} Defects.`;
-  if (skipped.length) msg += ` Skipped ${skipped.length} duplicate(s) already present: ${skipped.join(", ")}.`;
+  if (skipped.length) {
+    msg += ` Skipped ${skipped.length} duplicate(s) already present: ${skipped.join(", ")}.`;
+    if (backfilled) msg += ` Updated test-case fields on ${backfilled} of them from this paste.`;
+  }
   statusEl.className = "status-msg ok";
   statusEl.textContent = msg;
   sortAllSectionsByPriority();
@@ -1143,16 +1176,75 @@ function loadImageEl(src) {
   });
 }
 
+function crc32(buf) {
+  if (!crc32.table) {
+    const table = [];
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+    crc32.table = table;
+  }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) crc = crc32.table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Injects a pHYs chunk declaring the PNG's physical DPI. Word's OLE icon
+// display can recalculate the shown size from the image's own pixel
+// dimensions (assuming 96 DPI) rather than always respecting the shape's
+// explicit width/height style -- confirmed by a real report of the icon
+// rendering far too large after opening and closing the embedded object.
+// Declaring the correct DPI for the actual rendered pixel size fixes this
+// regardless of which sizing path a given Word version takes, since a
+// PNG's declared DPI is standard, unambiguous metadata every viewer can
+// use to compute physical size from pixel count.
+function injectPngDpi(pngBytes, dpi) {
+  const pixelsPerMeter = Math.round(dpi / 0.0254);
+  const typeBytes = new Uint8Array([0x70, 0x48, 0x59, 0x73]); // "pHYs"
+  const data = new Uint8Array(9);
+  const dv = new DataView(data.buffer);
+  dv.setUint32(0, pixelsPerMeter, false);
+  dv.setUint32(4, pixelsPerMeter, false);
+  data[8] = 1; // unit specifier: 1 = meters
+
+  const typeAndData = new Uint8Array(typeBytes.length + data.length);
+  typeAndData.set(typeBytes, 0);
+  typeAndData.set(data, typeBytes.length);
+  const crc = crc32(typeAndData);
+
+  const chunk = new Uint8Array(4 + typeAndData.length + 4);
+  new DataView(chunk.buffer).setUint32(0, data.length, false);
+  chunk.set(typeAndData, 4);
+  new DataView(chunk.buffer).setUint32(4 + typeAndData.length, crc, false);
+
+  // IHDR is always the first chunk, immediately after the 8-byte PNG
+  // signature, and always exactly 13 bytes of data (width/height/bit
+  // depth/color type/compression/filter/interlace) -- so its end is at a
+  // fixed offset for any valid PNG, not just canvas output.
+  const ihdrEnd = 8 + 4 + 4 + 13 + 4; // signature + len + "IHDR" + data + crc = 33
+  const out = new Uint8Array(pngBytes.length + chunk.length);
+  out.set(pngBytes.subarray(0, ihdrEnd), 0);
+  out.set(chunk, ihdrEnd);
+  out.set(pngBytes.subarray(ihdrEnd), ihdrEnd + chunk.length);
+  return out;
+}
+
 // Draws the OLE icon shown for the embedded Excel: the spreadsheet icon
 // asset plus a wrapped filename label, matching the on-page shape size
 // baked into the template (117.35pt x 75pt, ~1.565:1 aspect ratio) --
-// rendered at a higher pixel scale for crisp display regardless of zoom.
+// rendered at a higher pixel scale for crisp display, with the PNG's DPI
+// metadata set to match so the declared pixel-to-physical-size ratio is
+// correct regardless of pixel count.
 function drawTsrIconPng(iconImage, filename) {
   return new Promise((resolve, reject) => {
     try {
+      const targetWidthPt = 117.35;
+      const targetHeightPt = 75;
       const scale = 4;
-      const W = Math.round(117.35 * scale);
-      const H = Math.round(75 * scale);
+      const W = Math.round(targetWidthPt * scale);
+      const H = Math.round(targetHeightPt * scale);
       const canvas = document.createElement("canvas");
       canvas.width = W;
       canvas.height = H;
@@ -1193,7 +1285,11 @@ function drawTsrIconPng(iconImage, filename) {
 
       canvas.toBlob(blob => {
         if (!blob) { reject(new Error("Canvas toBlob failed")); return; }
-        blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf))).catch(reject);
+        blob.arrayBuffer().then(buf => {
+          const widthInches = targetWidthPt / 72;
+          const dpi = W / widthInches;
+          resolve(injectPngDpi(new Uint8Array(buf), dpi));
+        }).catch(reject);
       }, "image/png");
     } catch (err) {
       reject(err);
