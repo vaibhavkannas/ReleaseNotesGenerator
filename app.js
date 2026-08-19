@@ -1146,7 +1146,21 @@ function buildTsrSheetXml(sheetXml, tickets) {
 function buildTsrWorkbookXml(workbookXml, sheetName) {
   const re = /(<sheet name=")[^"]*("\s+sheetId="1")/;
   if (!re.test(workbookXml)) throw new Error("TSR workbook: sheet name anchor not found");
-  return workbookXml.replace(re, `$1${xmlEscape(sheetName)}$2`);
+  let out = workbookXml.replace(re, `$1${xmlEscape(sheetName)}$2`);
+
+  // oleSize defines the cell range Word uses to compute the OLE object's
+  // "true" size, independent of the icon image or its DPI -- this is what
+  // Word appears to fall back to when it recalculates the icon's displayed
+  // size after the embedded object is opened and closed, and the sheet's
+  // own columns are quite wide (confirmed: A-H widths sum to roughly 166
+  // character units, well over a foot wide at Excel's default character-to-
+  // pixel scaling). Shrinking this to a single cell keeps that recalculated
+  // "true" size small regardless of how wide the actual data columns are,
+  // without needing to touch the columns themselves (so the sheet stays
+  // fully readable when genuinely opened for editing).
+  const oleSizeRe = /<oleSize ref="[^"]*"\/>/;
+  if (oleSizeRe.test(out)) out = out.replace(oleSizeRe, '<oleSize ref="A1:A1"/>');
+  return out;
 }
 
 async function buildTsrExcelBytes(embeddedXlsxBytes, tickets, sheetName, xlsxTitle) {
