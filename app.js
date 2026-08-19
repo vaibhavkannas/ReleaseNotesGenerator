@@ -61,10 +61,10 @@ const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Rele
 const GRID_MIN_ROWS = 4;
 
 const EXAMPLE_TICKET_ROWS = [
-  ["Task", "TIC04-1", "RBS changes", "Critical", "Business Configuration", "RBS", "", "Core", "", "", "", ""],
-  ["Requirement", "TIC04-2", "Contract Booking Enhancement", "Highest", "Requirements", "CR/Requirement", "", "Core", "", "", "", ""],
-  ["Task", "TIC04-3", "Data Fix for application # 100", "High", "Tasks Completed", "Datafix", "Yes", "Core, PP", "", "", "", ""],
-  ["Defect", "TIC03-1", "Malformed Statement Invoice file", "Medium", "Code Drop Defects", "Bug", "", "Core", "", "", "", ""],
+  ["Task", "TIC04-1", "RBS changes", "Critical", "Business Configuration", "RBS", "", "Core", "3", "3", "0", ""],
+  ["Requirement", "TIC04-2", "Contract Booking Enhancement", "Highest", "Requirements", "CR/Requirement", "", "Core", "12", "12", "0", ""],
+  ["Task", "TIC04-3", "Data Fix for application # 100", "High", "Tasks Completed", "Datafix", "Yes", "Core, PP", "5", "4", "1", "Retest needed after config fix"],
+  ["Defect", "TIC03-1", "Malformed Statement Invoice file", "Medium", "Code Drop Defects", "Bug", "", "Core", "8", "8", "0", ""],
 ];
 
 let uploadedTemplateBuffer = null;
