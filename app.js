@@ -360,11 +360,17 @@ document.addEventListener("DOMContentLoaded", () => {
   content.addEventListener("change", scheduleFormChangeHandlers);
   content.addEventListener("click", scheduleFormChangeHandlers);
 
+  // Instant feedback on the TSR checkbox itself (show/hide the totals
+  // preview immediately) rather than waiting on the 200ms debounce that
+  // covers general form typing.
+  document.getElementById("generateTsrCheckbox").addEventListener("change", renderTsrTotalsPreview);
+
   // Offer to restore an autosaved draft, if one exists
   const saved = Store.get(AUTOSAVE_KEY);
   if (saved) showRestoreBanner(saved);
 
   renderSummary();
+  renderTsrTotalsPreview();
   validateForm();
 });
 
@@ -396,8 +402,49 @@ function scheduleFormChangeHandlers() {
     updateAllSectionCollapseStates();
     renderSummary();
     validateForm();
+    renderTsrTotalsPreview();
     autosaveDraft();
   }, 200);
+}
+
+// Live preview of the TSR's computed "PI Functional / Defects Testing"
+// totals -- the exact same collectAllTicketsForTsr() + sum logic
+// buildTsrDocx() uses at generation time, surfaced in the UI itself so
+// someone can sanity-check the numbers before ever downloading the file.
+function renderTsrTotalsPreview() {
+  const panel = document.getElementById("tsrTotalsPreview");
+  if (!panel) return;
+  const checkbox = document.getElementById("generateTsrCheckbox");
+  if (!checkbox || !checkbox.checked) {
+    panel.classList.remove("visible");
+    panel.innerHTML = "";
+    return;
+  }
+  const tickets = collectAllTicketsForTsr();
+  const sum = (field) => tickets.reduce((acc, t) => acc + (Number(t[field]) || 0), 0);
+  const total = sum("numTestCases");
+  const passed = sum("testCasesPassed");
+  const failed = sum("testCasesFailed");
+  const ticketsWithData = tickets.filter(t =>
+    (Number(t.numTestCases) || 0) > 0 || (Number(t.testCasesPassed) || 0) > 0 || (Number(t.testCasesFailed) || 0) > 0
+  ).length;
+
+  panel.classList.add("visible");
+  panel.innerHTML = `
+    <div class="tsr-stat">
+      <p class="tsr-stat-label">Total test cases</p>
+      <p class="tsr-stat-value">${total}</p>
+    </div>
+    <div class="tsr-stat tsr-stat-passed">
+      <p class="tsr-stat-label">Passed</p>
+      <p class="tsr-stat-value">${passed}</p>
+    </div>
+    <div class="tsr-stat tsr-stat-failed">
+      <p class="tsr-stat-label">Failed</p>
+      <p class="tsr-stat-value">${failed}</p>
+    </div>
+    <p class="tsr-totals-preview-note">Based on ${ticketsWithData} ticket${ticketsWithData === 1 ? "" : "s"} with test-case data entered</p>
+  `;
 }
 
 function autosaveDraft() {
@@ -812,6 +859,7 @@ function moveTicketRow(rowEl, fromKey, toKey) {
   updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
+  renderTsrTotalsPreview();
   autosaveDraft();
 }
 
@@ -980,6 +1028,7 @@ function onParseTickets() {
   sortAllSectionsByPriority();
   updateAllSectionCollapseStates();
   validateForm();
+  renderTsrTotalsPreview();
 }
 
 // ---------- Data collection ----------
@@ -1794,6 +1843,7 @@ function onClearParsedTickets() {
   });
   updateAllSectionCollapseStates();
   validateForm();
+  renderTsrTotalsPreview();
   showUndoToast(`Cleared ${totalTickets} ticket(s).`, snapshot);
 }
 
@@ -1843,6 +1893,7 @@ function onResetAll() {
   updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
+  renderTsrTotalsPreview();
   showUndoToast("Release reset.", snapshot);
 }
 
@@ -1914,6 +1965,7 @@ function restoreFormState(state) {
   updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
+  renderTsrTotalsPreview();
 }
 
 function onSaveDraft() {
