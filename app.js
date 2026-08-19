@@ -584,6 +584,16 @@ function buildSiteDetailCards() {
     card.dataset.site = site;
     card.querySelector("[data-site-title]").textContent = `${site} — Release Details`;
 
+    // Default to today's date rather than leaving the field blank -- most
+    // releases go out same-day, so this saves a click for the common case.
+    // Setting .value directly (not simulating user input) doesn't fire any
+    // change/input events, so it can't trigger an autosave that would
+    // clobber a real prior session's saved date; restoreFormState() (draft
+    // load or "Restore" on the autosave banner) always runs after this and
+    // unconditionally overwrites it with whatever was actually saved,
+    // including deliberately blank, so a real saved value always wins.
+    card.querySelector('[data-field="releaseDate"]').value = todayIso();
+
     const rrpGrid = card.querySelector("[data-rrp-grid]");
     RRP_PACKAGES.forEach(pkg => {
       const div = document.createElement("div");
@@ -1054,6 +1064,16 @@ function collectRows(sectionKey) {
     }
   });
   return rows;
+}
+
+// Local (not UTC) today's date in YYYY-MM-DD, matching what <input type="date">
+// expects. Using local date components rather than toISOString() avoids the
+// classic off-by-one where UTC has already rolled to the next (or previous)
+// day relative to the person's own timezone.
+function todayIso() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function formatDateLong(isoDate) {
@@ -1863,7 +1883,7 @@ function onResetAll() {
     card.querySelector('[data-field="cdVersion"]').value = "";
     card.querySelector('[data-field="productVersion"]').value = "";
     card.querySelector('[data-field="fxVersion"]').value = "";
-    card.querySelector('[data-field="releaseDate"]').value = "";
+    card.querySelector('[data-field="releaseDate"]').value = todayIso();
     card.querySelector('[data-field="releaseType"]').value = "Full Release";
     card.querySelector('[data-field="hotfix"]').value = "No";
     RRP_PACKAGES.forEach(pkg => {
