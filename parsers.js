@@ -174,7 +174,7 @@ const HEADER_KEYWORDS = {
   datafix: ["datafix", "data fix"],
   assignee: ["assignee"],
   slno: ["sl no", "sl.no", "s.no", "sr no"],
-  numTestCases: ["number of test cases", "num test cases", "test cases", "# test cases", "# of test cases"],
+  numTestCases: ["number of test cases", "num test cases", "# test cases", "# of test cases"],
   testCasesPassed: ["test cases passed", "tc passed", "# passed", "passed"],
   testCasesFailed: ["test cases failed", "tc failed", "# failed", "failed"],
   comments: ["comments", "comment", "remarks", "notes"],

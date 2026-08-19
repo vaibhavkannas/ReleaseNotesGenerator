@@ -559,6 +559,12 @@ function buildSiteDetailCards() {
       if (pasteDetailsTextarea.value.trim() !== "") return;
       pasteDetailsTextarea.value = pasteDetailsTextarea.placeholder.replace(/\r/g, "");
       pasteDetailsTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+      // Select the just-inserted template text so the next paste or keystroke
+      // replaces it outright, rather than inserting at whatever cursor
+      // position the browser happens to leave after a programmatic value
+      // change (which can otherwise silently merge pasted real data with
+      // the template's literal placeholder text into one garbled blob).
+      pasteDetailsTextarea.select();
     });
 
     card.querySelector("[data-generate-chat]").addEventListener("click", () => {
@@ -1482,7 +1488,11 @@ async function onGenerate() {
   statusEl.textContent = "Generating…";
 
   try {
-    const templateBuffer = uploadedTemplateBuffer || await (await fetch(TEMPLATE_URL)).arrayBuffer();
+    const templateResp = uploadedTemplateBuffer ? null : await fetch(TEMPLATE_URL);
+    if (templateResp && !templateResp.ok) {
+      throw new Error(`Could not load the Release Notes template (HTTP ${templateResp.status}). Try refreshing the page.`);
+    }
+    const templateBuffer = uploadedTemplateBuffer || await templateResp.arrayBuffer();
     const files = [];
 
     for (const site of sites) {
@@ -1492,24 +1502,43 @@ async function onGenerate() {
       files.push({ site, filename, blob });
     }
 
+    // TSR generation is isolated in its own try/catch: it's a genuinely
+    // separate document with its own template, own embedded-Excel surgery,
+    // and its own failure modes -- none of which should cost the person the
+    // Release Notes file(s) that already built successfully just above.
+    let tsrWarning = null;
     const generateTsr = document.getElementById("generateTsrCheckbox").checked;
     if (generateTsr) {
       statusEl.textContent = "Generating Test Summary Report…";
-      // TSR is one combined document (not per-site), so it uses the first
-      // selected site's version/date -- same values already validated above.
-      const primarySite = sites[0];
-      const primaryValues = siteValuesMap[primarySite];
-      const tsrVersion = splitVersion(primaryValues.cdVersionRaw).cd;
-      const tickets = collectAllTicketsForTsr();
-      const tsrTemplateBuffer = await (await fetch(TSR_TEMPLATE_URL)).arrayBuffer();
-      const tsrBlob = await buildTsrDocx(tsrTemplateBuffer, tickets, tsrVersion, primaryValues.releaseDateIso);
-      files.push({ site: null, filename: `Odessa_Test_Summary_Report_${tsrVersion}.docx`, blob: tsrBlob });
+      try {
+        // TSR is one combined document (not per-site), so it uses the first
+        // selected site's version/date -- same values already validated above.
+        const primarySite = sites[0];
+        const primaryValues = siteValuesMap[primarySite];
+        const tsrVersion = splitVersion(primaryValues.cdVersionRaw).cd;
+        const tickets = collectAllTicketsForTsr();
+        const tsrResp = await fetch(TSR_TEMPLATE_URL);
+        if (!tsrResp.ok) {
+          throw new Error(`Could not load the Test Summary Report template (HTTP ${tsrResp.status}).`);
+        }
+        const tsrTemplateBuffer = await tsrResp.arrayBuffer();
+        const tsrBlob = await buildTsrDocx(tsrTemplateBuffer, tickets, tsrVersion, primaryValues.releaseDateIso);
+        files.push({ site: null, filename: `Odessa_Test_Summary_Report_${tsrVersion}.docx`, blob: tsrBlob });
+      } catch (tsrErr) {
+        console.error(tsrErr);
+        tsrWarning = tsrErr.message || "Something went wrong generating the Test Summary Report.";
+      }
     }
 
     lastGeneratedFiles = files;
     renderGeneratedFilesPanel(files);
-    statusEl.className = "status-msg ok";
-    statusEl.textContent = `Ready — ${files.length} file${files.length > 1 ? "s" : ""} generated below.`;
+    if (tsrWarning) {
+      statusEl.className = "status-msg error";
+      statusEl.textContent = `Release Notes ready below, but the Test Summary Report failed: ${tsrWarning}`;
+    } else {
+      statusEl.className = "status-msg ok";
+      statusEl.textContent = `Ready — ${files.length} file${files.length > 1 ? "s" : ""} generated below.`;
+    }
   } catch (err) {
     console.error(err);
     showError(err.message || "Something went wrong while generating the document.");
@@ -1655,10 +1684,15 @@ function validateForm() {
   Object.keys(keyMap).forEach(key => {
     const entries = keyMap[key];
     if (entries.length > 1) {
-      entries.forEach(({ rowEl }) => {
-        const others = entries.filter(e => e.rowEl !== rowEl).map(e => e.section);
-        const uniqueOthers = [...new Set(others)];
-        flagRow(rowEl, `${key} also appears in: ${uniqueOthers.join(", ")}${uniqueOthers.length === 0 ? " (duplicate in this section)" : ""}`);
+      entries.forEach(({ section: ownSection, rowEl }) => {
+        const others = entries.filter(e => e.rowEl !== rowEl);
+        const otherSections = [...new Set(others.map(e => e.section))];
+        const differentSections = otherSections.filter(s => s !== ownSection);
+        const sameSectionDupeCount = others.filter(e => e.section === ownSection).length;
+        const parts = [];
+        if (differentSections.length) parts.push(`also appears in: ${differentSections.join(", ")}`);
+        if (sameSectionDupeCount) parts.push(`appears ${sameSectionDupeCount + 1} times within ${ownSection}`);
+        flagRow(rowEl, `${key} ${parts.join("; ")}`);
       });
     }
   });
