@@ -784,11 +784,27 @@ function refreshSiteTagsForSection(sectionKey) {
     const tagsDiv = row.querySelector("[data-site-tags]");
     const existing = {};
     tagsDiv.querySelectorAll("input").forEach(inp => { existing[inp.value] = inp.checked; });
+    let parsedSites = [];
+    if (row.dataset.parsedSites) {
+      try { parsedSites = JSON.parse(row.dataset.parsedSites); } catch (e) { /* ignore malformed */ }
+    }
     tagsDiv.innerHTML = "";
     sites.forEach(site => {
       const label = document.createElement("label");
       label.className = "site-tag";
-      const checked = existing.hasOwnProperty(site) ? existing[site] : (sites.length === 1);
+      // Preserve this row's current checked state if the checkbox already
+      // existed. Otherwise -- most commonly, a site that's just been newly
+      // enabled at the top level, so this row has never had a checkbox for
+      // it before -- fall back to whether the original paste mentioned this
+      // site at all (parsedSites), rather than only the "just one site
+      // selected" heuristic. Without this, enabling a new site after tickets
+      // were already parsed silently drops that site from every row that
+      // originally mentioned it, even though the data was never lost --
+      // it was sitting in parsedSites the whole time.
+      let checked;
+      if (existing.hasOwnProperty(site)) checked = existing[site];
+      else if (parsedSites.includes(site)) checked = true;
+      else checked = sites.length === 1;
       label.innerHTML = `<input type="checkbox" value="${escapeHtml(site)}" ${checked ? "checked" : ""}><span>${escapeHtml(site)}</span>`;
       tagsDiv.appendChild(label);
     });
