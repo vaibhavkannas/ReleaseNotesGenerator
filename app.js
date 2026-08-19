@@ -406,6 +406,31 @@ function autosaveDraft() {
   } catch (e) { /* non-fatal */ }
 }
 
+let undoToastTimer = null;
+
+// Reusable undo mechanism for destructive actions (Reset all, Clear parsed
+// tickets): capture a full form-state snapshot right before the action, show
+// a brief toast offering to restore it, and auto-dismiss after 10 seconds --
+// standard "message sent, Undo" pattern. The snapshot is simply the same
+// serializeFormState()/restoreFormState() pair the draft save/load and
+// autosave features already use, so restoring is guaranteed to put
+// everything back exactly as it was, not just the specific fields the
+// triggering action happened to touch.
+function showUndoToast(message, snapshotState) {
+  clearTimeout(undoToastTimer);
+  const toast = document.getElementById("undoToast");
+  document.getElementById("undoToastMessage").textContent = message;
+  toast.classList.remove("hidden");
+  const btn = document.getElementById("undoToastBtn");
+  btn.onclick = () => {
+    restoreFormState(snapshotState);
+    autosaveDraft();
+    toast.classList.add("hidden");
+    clearTimeout(undoToastTimer);
+  };
+  undoToastTimer = setTimeout(() => toast.classList.add("hidden"), 10000);
+}
+
 function showRestoreBanner(savedJson) {
   const banner = document.getElementById("draftBanner");
   banner.classList.remove("hidden");
@@ -1507,6 +1532,20 @@ async function onGenerate() {
     cdd: collectRows("cdd"),
   };
 
+  const generateTsr = document.getElementById("generateTsrCheckbox").checked;
+  if (generateTsr) {
+    const tsrTicketsPreview = collectAllTicketsForTsr();
+    const hasAnyTestCaseData = tsrTicketsPreview.some(t =>
+      (Number(t.numTestCases) || 0) > 0 || (Number(t.testCasesPassed) || 0) > 0 || (Number(t.testCasesFailed) || 0) > 0
+    );
+    if (!hasAnyTestCaseData) {
+      const proceed = confirm(
+        "No test-case data entered — the Test Summary Report's numbers will all be zero. Continue anyway?\n\n(Cancel to go back and fill in # Test Cases / # Passed / # Failed on your tickets first.)"
+      );
+      if (!proceed) return;
+    }
+  }
+
   btn.disabled = true;
   statusEl.textContent = "Generating…";
 
@@ -1532,7 +1571,6 @@ async function onGenerate() {
     // and its own failure modes -- none of which should cost the person the
     // Release Notes file(s) that already built successfully just above.
     let tsrWarning = null;
-    const generateTsr = document.getElementById("generateTsrCheckbox").checked;
     if (generateTsr) {
       statusEl.textContent = "Generating Test Summary Report…";
       try {
@@ -1749,16 +1787,21 @@ function onClearParsedTickets() {
   );
   if (!confirmed) return;
 
+  const snapshot = serializeFormState();
+
   Object.keys(SECTION_CONFIG).forEach(sec => {
     document.getElementById(`${sec}-rows`).innerHTML = "";
   });
   updateAllSectionCollapseStates();
   validateForm();
+  showUndoToast(`Cleared ${totalTickets} ticket(s).`, snapshot);
 }
 
 function onResetAll() {
   const confirmed = confirm("This clears everything you've entered (release details, tickets, notes) and starts a fresh release. Continue?");
   if (!confirmed) return;
+
+  const snapshot = serializeFormState();
 
   document.querySelectorAll('input[name="site"]').forEach(cb => { cb.checked = cb.value === "Core"; });
   updateSiteDetailVisibility();
@@ -1800,6 +1843,7 @@ function onResetAll() {
   updateAllSectionCollapseStates();
   renderSummary();
   validateForm();
+  showUndoToast("Release reset.", snapshot);
 }
 
 // ---------- Draft serialization (autosave + manual save/load) ----------

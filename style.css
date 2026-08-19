@@ -836,6 +836,49 @@ body {
 }
 .draft-banner .btn { margin-left: 4px; }
 
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1f2937;
+  color: #fff;
+  padding: 12px 16px 12px 18px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 13.5px;
+  z-index: 1000;
+  animation: undoToastIn 0.2s ease-out;
+}
+.undo-toast.hidden { display: none; }
+.undo-toast .btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  padding: 5px 12px;
+}
+.undo-toast .btn:hover { background: rgba(255, 255, 255, 0.12); }
+@keyframes undoToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@media (max-width: 720px) {
+  .undo-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    transform: none;
+    justify-content: space-between;
+  }
+  @keyframes undoToastIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
 /* --- Toolbar --- */
 
 .toolbar-card {
