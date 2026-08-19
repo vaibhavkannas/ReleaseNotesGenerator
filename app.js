@@ -29,6 +29,15 @@ const SECTION_CONFIG = {
   cdd:       { rowFields: ["key", "summary", "priority", "datafix"], mapTo: { key: "ROW_KEY", summary: "ROW_SUMMARY", priority: "ROW_PRIORITY", datafix: "ROW_DATAFIX" } },
 };
 
+// Fields that exist on every ticket row regardless of section, used only for
+// the Test Summary Report's embedded Excel (not part of the Release Notes
+// docx's own per-section tokens, so kept separate from rowFields/mapTo above
+// to avoid polluting RN's token substitution with TSR-only data).
+const TSR_EXTRA_FIELDS = ["issueType", "numTestCases", "testCasesPassed", "testCasesFailed", "comments"];
+// Default "Issue Type" per section, used to pre-fill when a ticket is routed
+// via paste-parsing and the source data's own Issue Type column is blank.
+const SECTION_DEFAULT_ISSUE_TYPE = { bizconfig: "Task", req: "Requirement", tasks: "Task", cdd: "Defect" };
+
 // Rule: within any section that has a Priority field, tickets must always be
 // ordered Critical > Highest > High > Medium > Low (Lowest sinks below Low;
 // anything unrecognized or blank sinks to the very end).
@@ -47,15 +56,15 @@ const SECTION_LABELS = {
 
 // Columns in display order; data-col attributes on <th>/<td> must match these keys,
 // and these are exactly the field names parseTicketPaste()'s header-matching understands.
-const GRID_COLUMNS = ["issueType", "key", "summary", "priority", "targetSection", "subType", "datafix", "sites"];
-const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Release Notes Section", "Type", "Datafix", "Applies To (Core/PP/CP)"];
+const GRID_COLUMNS = ["issueType", "key", "summary", "priority", "targetSection", "subType", "datafix", "sites", "numTestCases", "testCasesPassed", "testCasesFailed", "comments"];
+const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Release Notes Section", "Type", "Datafix", "Applies To (Core/PP/CP)", "# Test Cases", "# Passed", "# Failed", "Comments"];
 const GRID_MIN_ROWS = 4;
 
 const EXAMPLE_TICKET_ROWS = [
-  ["Task", "TIC04-1", "RBS changes", "Critical", "Business Configuration", "RBS", "", "Core"],
-  ["Requirement", "TIC04-2", "Contract Booking Enhancement", "Highest", "Requirements", "CR/Requirement", "", "Core"],
-  ["Task", "TIC04-3", "Data Fix for application # 100", "High", "Tasks Completed", "Datafix", "Yes", "Core, PP"],
-  ["Defect", "TIC03-1", "Malformed Statement Invoice file", "Medium", "Code Drop Defects", "Bug", "", "Core"],
+  ["Task", "TIC04-1", "RBS changes", "Critical", "Business Configuration", "RBS", "", "Core", "", "", "", ""],
+  ["Requirement", "TIC04-2", "Contract Booking Enhancement", "Highest", "Requirements", "CR/Requirement", "", "Core", "", "", "", ""],
+  ["Task", "TIC04-3", "Data Fix for application # 100", "High", "Tasks Completed", "Datafix", "Yes", "Core, PP", "", "", "", ""],
+  ["Defect", "TIC03-1", "Malformed Statement Invoice file", "Medium", "Code Drop Defects", "Bug", "", "Core", "", "", "", ""],
 ];
 
 let uploadedTemplateBuffer = null;
@@ -809,6 +818,13 @@ function addRowWithData(sectionKey, record, mark = true) {
     }
     if (mark) markAutoFilled(input.closest(".field"), input);
   });
+  TSR_EXTRA_FIELDS.forEach(f => {
+    const input = rowEl.querySelector(`[data-field="${f}"]`);
+    if (!input) return;
+    let value = record[f] !== undefined && record[f] !== "" ? record[f] : "";
+    if (f === "issueType" && !value) value = record.issueType || SECTION_DEFAULT_ISSUE_TYPE[sectionKey] || "";
+    input.value = value;
+  });
   if (record.sites && record.sites.length) setRowSites(rowEl, record.sites);
   // Remember everything the source data mentioned about sites, even sites
   // that aren't among the release's currently-selected top-level sites (those
@@ -890,6 +906,10 @@ function collectRows(sectionKey) {
       const input = rowEl.querySelector(`[data-field="${f}"]`);
       data[f] = input ? input.value.trim() : "";
     });
+    TSR_EXTRA_FIELDS.forEach(f => {
+      const input = rowEl.querySelector(`[data-field="${f}"]`);
+      data[f] = input ? input.value.trim() : "";
+    });
     const sites = Array.from(rowEl.querySelectorAll("[data-site-tags] input:checked")).map(i => i.value);
     const parsedSites = rowEl.dataset.parsedSites ? JSON.parse(rowEl.dataset.parsedSites) : sites;
     if (data.key || data.summary) {
@@ -913,6 +933,15 @@ function formatDateRev(isoDate) {
   const dt = new Date(Date.UTC(y, m - 1, d));
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   return `${months[dt.getUTCMonth()]} ${dt.getUTCDate()} - ${dt.getUTCFullYear()}`;
+}
+
+// TSR document uses DD/MM/YYYY throughout (unlike Release Notes' "Month DD,
+// YYYY"), confirmed against the base template's own Table 1/2 and page 3/4 dates.
+function formatDateShort(isoDate) {
+  if (!isoDate) return "";
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d)}/${pad(m)}/${y}`;
 }
 
 function splitVersion(full) {
@@ -1031,6 +1060,239 @@ async function buildDocxForSite(templateArrayBuffer, site, sections, siteValues,
   return new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
 }
 
+// ---------- Test Summary Report (TSR) generation ----------
+
+const TSR_TEMPLATE_VERSION = 1;
+const TSR_TEMPLATE_URL = `assets/tsr_master_template.docx?v=${TSR_TEMPLATE_VERSION}`;
+
+// Replaces all data rows in the embedded xlsx's sheet1.xml with fresh rows
+// built from ticket data, using inline strings (t="inlineStr") so nothing
+// needs to be added to sharedStrings.xml. Style ids (5 for most columns, 6
+// for Summary specifically) and the header row are preserved verbatim from
+// the template -- confirmed against the base file's own row structure.
+function buildTsrSheetXml(sheetXml, tickets) {
+  const rowRegex = /<row r="\d+".*?<\/row>/gs;
+  const rowsFound = sheetXml.match(rowRegex);
+  if (!rowsFound || rowsFound.length === 0) throw new Error("TSR sheet: no rows found in embedded workbook");
+  const headerRow = rowsFound[0];
+  const oldRowsBlock = rowsFound.join("");
+
+  function cellStr(col, rowNum, value, style) {
+    if (value === undefined || value === null || value === "") return `<c r="${col}${rowNum}" s="${style}"/>`;
+    return `<c r="${col}${rowNum}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
+  }
+  function cellNum(col, rowNum, value, style) {
+    if (value === undefined || value === null || value === "") return `<c r="${col}${rowNum}" s="${style}"/>`;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return `<c r="${col}${rowNum}" s="${style}"/>`;
+    return `<c r="${col}${rowNum}" s="${style}"><v>${n}</v></c>`;
+  }
+
+  const newRows = [headerRow];
+  tickets.forEach((t, i) => {
+    const r = i + 2;
+    const cells =
+      cellStr("A", r, t.issueType, 5) +
+      cellStr("B", r, t.key, 5) +
+      cellStr("C", r, t.summary, 6) +
+      cellStr("D", r, t.priority, 5) +
+      cellNum("E", r, t.numTestCases, 5) +
+      cellNum("F", r, t.testCasesPassed, 5) +
+      cellNum("G", r, t.testCasesFailed, 5) +
+      cellStr("H", r, t.comments, 5);
+    newRows.push(`<row r="${r}" spans="1:8" x14ac:dyDescent="0.3">${cells}</row>`);
+  });
+  const newRowsBlock = newRows.join("");
+
+  let out = sheetXml.replace(oldRowsBlock, newRowsBlock);
+  const lastRow = tickets.length + 1;
+  out = out.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:H${lastRow}"/>`);
+  return out;
+}
+
+function buildTsrWorkbookXml(workbookXml, sheetName) {
+  const re = /(<sheet name=")[^"]*("\s+sheetId="1")/;
+  if (!re.test(workbookXml)) throw new Error("TSR workbook: sheet name anchor not found");
+  return workbookXml.replace(re, `$1${xmlEscape(sheetName)}$2`);
+}
+
+async function buildTsrExcelBytes(embeddedXlsxBytes, tickets, sheetName, xlsxTitle) {
+  const zip = await JSZip.loadAsync(embeddedXlsxBytes);
+
+  let sheetXml = await zip.file("xl/worksheets/sheet1.xml").async("string");
+  sheetXml = buildTsrSheetXml(sheetXml, tickets);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+
+  let workbookXml = await zip.file("xl/workbook.xml").async("string");
+  workbookXml = buildTsrWorkbookXml(workbookXml, sheetName);
+  zip.file("xl/workbook.xml", workbookXml);
+
+  let coreXml = await zip.file("docProps/core.xml").async("string");
+  coreXml = coreXml.replace(/<dc:title>.*?<\/dc:title>/, `<dc:title>${xmlEscape(xlsxTitle)}</dc:title>`);
+  zip.file("docProps/core.xml", coreXml);
+
+  return zip.generateAsync({ type: "uint8array" });
+}
+
+function loadImageEl(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+}
+
+// Draws the OLE icon shown for the embedded Excel: the spreadsheet icon
+// asset plus a wrapped filename label, matching the on-page shape size
+// baked into the template (117.35pt x 75pt, ~1.565:1 aspect ratio) --
+// rendered at a higher pixel scale for crisp display regardless of zoom.
+function drawTsrIconPng(iconImage, filename) {
+  return new Promise((resolve, reject) => {
+    try {
+      const scale = 4;
+      const W = Math.round(117.35 * scale);
+      const H = Math.round(75 * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, W, H);
+
+      const iconSize = Math.round(H * 0.55);
+      const iconX = Math.round((W - iconSize) / 2);
+      const iconY = Math.round(H * 0.02);
+      ctx.drawImage(iconImage, iconX, iconY, iconSize, iconSize);
+
+      const fontSize = Math.round(H * 0.10);
+      ctx.font = `${fontSize}px Arial, sans-serif`;
+      ctx.fillStyle = "#404040";
+      ctx.textAlign = "center";
+
+      const maxWidth = W - Math.round(W * 0.06);
+      const parts = filename.split(/(_)/);
+      const lines = [];
+      let current = "";
+      parts.forEach(part => {
+        const trial = current + part;
+        if (ctx.measureText(trial).width > maxWidth && current) {
+          lines.push(current);
+          current = part;
+        } else {
+          current = trial;
+        }
+      });
+      if (current) lines.push(current);
+
+      const lineHeight = Math.round(fontSize * 1.25);
+      let y = iconY + iconSize + Math.round(H * 0.06) + fontSize;
+      lines.forEach(line => {
+        ctx.fillText(line.trim(), W / 2, y);
+        y += lineHeight;
+      });
+
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error("Canvas toBlob failed")); return; }
+        blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf))).catch(reject);
+      }, "image/png");
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Gathers every ticket across all 4 sections (unlike Release Notes, the TSR
+// isn't per-site -- it's one combined test-coverage record for the release).
+function collectAllTicketsForTsr() {
+  const tickets = [];
+  Object.keys(SECTION_CONFIG).forEach(sectionKey => {
+    collectRows(sectionKey).forEach(r => {
+      tickets.push({
+        issueType: r.data.issueType || SECTION_DEFAULT_ISSUE_TYPE[sectionKey] || "",
+        key: r.data.key || "",
+        summary: r.data.summary || "",
+        priority: r.data.priority || "", // bizconfig rows have no priority field; left blank
+        numTestCases: r.data.numTestCases || "",
+        testCasesPassed: r.data.testCasesPassed || "",
+        testCasesFailed: r.data.testCasesFailed || "",
+        comments: r.data.comments || "",
+      });
+    });
+  });
+  return tickets;
+}
+
+async function buildTsrDocx(templateArrayBuffer, tickets, releaseVersion, releaseDateIso) {
+  const zip = await JSZip.loadAsync(templateArrayBuffer);
+
+  const releaseDateLong = formatDateLong(releaseDateIso);
+  const releaseDateShort = formatDateShort(releaseDateIso);
+
+  // "PI Functional / Defects Testing" column computed from ticket test-case
+  // data; "Smoke/Regression/E2E" and "Total" columns stay blank for manual
+  // entry; deferred/NA rows are always 0, per explicit instruction.
+  const sum = (field) => tickets.reduce((acc, t) => acc + (Number(t[field]) || 0), 0);
+  const totalTcs = sum("numTestCases");
+  const passedTcs = sum("testCasesPassed");
+  const failedTcs = sum("testCasesFailed");
+  const executedTcs = totalTcs;
+
+  const scalarTokens = {
+    CURRENT_RELEASE_VERSION: releaseVersion,
+    RELEASE_DATE_LONG: releaseDateLong,
+    RELEASE_DATE_SHORT: releaseDateShort,
+    TSR_TOTAL_TCS_FUNCTIONAL: String(totalTcs), TSR_TOTAL_TCS_SMOKE: "", TSR_TOTAL_TCS_TOTAL: "",
+    TSR_EXECUTED_TCS_FUNCTIONAL: String(executedTcs), TSR_EXECUTED_TCS_SMOKE: "", TSR_EXECUTED_TCS_TOTAL: "",
+    TSR_PASSED_TCS_FUNCTIONAL: String(passedTcs), TSR_PASSED_TCS_SMOKE: "", TSR_PASSED_TCS_TOTAL: "",
+    TSR_FAILED_TCS_FUNCTIONAL: String(failedTcs), TSR_FAILED_TCS_SMOKE: "", TSR_FAILED_TCS_TOTAL: "",
+    TSR_DEFERRED_TCS_FUNCTIONAL: "0", TSR_DEFERRED_TCS_SMOKE: "", TSR_DEFERRED_TCS_TOTAL: "",
+    TSR_NA_TCS_FUNCTIONAL: "0", TSR_NA_TCS_SMOKE: "", TSR_NA_TCS_TOTAL: "",
+  };
+
+  const filesToPatch = ["word/document.xml", "word/footer1.xml", "docProps/core.xml"];
+  for (const filePath of filesToPatch) {
+    let xml = await zip.file(filePath).async("string");
+    Object.keys(scalarTokens).forEach(k => {
+      xml = xml.split(`{{${k}}}`).join(xmlEscape(scalarTokens[k]));
+    });
+    zip.file(filePath, xml);
+  }
+
+  const finalDocXml = await zip.file("word/document.xml").async("string");
+  const remaining = finalDocXml.match(/\{\{[A-Z_]+\}\}/g);
+  if (remaining) console.warn("TSR: unresolved tokens:", [...new Set(remaining)]);
+
+  const embedName = Object.keys(zip.files).find(n => /^word\/embeddings\/Odessa_Test_Summary_Report.*\.xlsx$/.test(n));
+  if (!embedName) throw new Error("TSR template: embedded Excel placeholder not found. The template may be corrupted.");
+  const embeddedBytes = await zip.file(embedName).async("uint8array");
+
+  const sheetName = `PI${releaseVersion}`;
+  const xlsxTitle = `Odessa_Test_Summary_Report_${releaseVersion}`;
+  const newXlsxBytes = await buildTsrExcelBytes(embeddedBytes, tickets, sheetName, xlsxTitle);
+
+  const newEmbedName = `word/embeddings/${xlsxTitle}.xlsx`;
+  zip.remove(embedName);
+  zip.file(newEmbedName, newXlsxBytes);
+
+  let rels = await zip.file("word/_rels/document.xml.rels").async("string");
+  const oldTarget = embedName.replace("word/", "");
+  const newTarget = newEmbedName.replace("word/", "");
+  if (!rels.includes(`Target="${oldTarget}"`)) throw new Error("TSR template: embedded Excel relationship not found.");
+  rels = rels.replace(`Target="${oldTarget}"`, `Target="${newTarget}"`);
+  zip.file("word/_rels/document.xml.rels", rels);
+
+  try {
+    const iconImg = await loadImageEl("assets/tsr_xlsx_icon.png");
+    const iconPngBytes = await drawTsrIconPng(iconImg, `${xlsxTitle}.xlsx`);
+    zip.file("word/media/image4.png", iconPngBytes);
+  } catch (err) {
+    console.warn("TSR: icon redraw failed, keeping placeholder icon.", err);
+  }
+
+  const rawBlob = await zip.generateAsync({ type: "blob" });
+  return new Blob([rawBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+
 // ---------- Generate ----------
 
 let lastGeneratedFiles = [];
@@ -1091,6 +1353,20 @@ async function onGenerate() {
       const cdVersion = splitVersion(siteValuesMap[site].cdVersionRaw).cd;
       const filename = `FOCUS Code Drop ${cdVersion} Release Notes ${site}.docx`;
       files.push({ site, filename, blob });
+    }
+
+    const generateTsr = document.getElementById("generateTsrCheckbox").checked;
+    if (generateTsr) {
+      statusEl.textContent = "Generating Test Summary Report…";
+      // TSR is one combined document (not per-site), so it uses the first
+      // selected site's version/date -- same values already validated above.
+      const primarySite = sites[0];
+      const primaryValues = siteValuesMap[primarySite];
+      const tsrVersion = splitVersion(primaryValues.cdVersionRaw).cd;
+      const tickets = collectAllTicketsForTsr();
+      const tsrTemplateBuffer = await (await fetch(TSR_TEMPLATE_URL)).arrayBuffer();
+      const tsrBlob = await buildTsrDocx(tsrTemplateBuffer, tickets, tsrVersion, primaryValues.releaseDateIso);
+      files.push({ site: null, filename: `Odessa_Test_Summary_Report_${tsrVersion}.docx`, blob: tsrBlob });
     }
 
     lastGeneratedFiles = files;

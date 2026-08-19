@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=26" />
+<link rel="stylesheet" href="style.css?v=27" />
 </head>
 <body>
 <div class="app">
@@ -92,6 +92,10 @@
                 <th data-col="subType">Type</th>
                 <th data-col="datafix">Datafix</th>
                 <th data-col="sites">Applies To (Core/PP/CP)</th>
+                <th data-col="numTestCases"># Test Cases</th>
+                <th data-col="testCasesPassed"># Passed</th>
+                <th data-col="testCasesFailed"># Failed</th>
+                <th data-col="comments">Comments</th>
                 <th class="excel-grid-rowaction-col"></th>
               </tr>
             </thead>
@@ -138,6 +142,13 @@
             <div class="field"><label>Type</label><input type="text" data-field="type" placeholder="RBS / EBC / Portfolio Config" /></div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
+          <div class="grid grid-tsr-fields">
+            <div class="field"><label>Issue Type</label><input type="text" data-field="issueType" placeholder="Task" /></div>
+            <div class="field"><label># Test Cases</label><input type="number" data-field="numTestCases" min="0" /></div>
+            <div class="field"><label># Passed</label><input type="number" data-field="testCasesPassed" min="0" /></div>
+            <div class="field"><label># Failed</label><input type="number" data-field="testCasesFailed" min="0" /></div>
+            <div class="field field-wide"><label>Test Comments</label><input type="text" data-field="comments" /></div>
+          </div>
         </div>
       </template>
     </section>
@@ -171,6 +182,13 @@
               <select data-field="priority"><option value="" selected disabled hidden>Select priority…</option><option>Critical</option><option>Highest</option><option>High</option><option>Medium</option><option>Low</option><option>Lowest</option></select>
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
+          </div>
+          <div class="grid grid-tsr-fields">
+            <div class="field"><label>Issue Type</label><input type="text" data-field="issueType" placeholder="Requirement" /></div>
+            <div class="field"><label># Test Cases</label><input type="number" data-field="numTestCases" min="0" /></div>
+            <div class="field"><label># Passed</label><input type="number" data-field="testCasesPassed" min="0" /></div>
+            <div class="field"><label># Failed</label><input type="number" data-field="testCasesFailed" min="0" /></div>
+            <div class="field field-wide"><label>Test Comments</label><input type="text" data-field="comments" /></div>
           </div>
         </div>
       </template>
@@ -234,6 +252,13 @@
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
+          <div class="grid grid-tsr-fields">
+            <div class="field"><label>Issue Type</label><input type="text" data-field="issueType" placeholder="Task" /></div>
+            <div class="field"><label># Test Cases</label><input type="number" data-field="numTestCases" min="0" /></div>
+            <div class="field"><label># Passed</label><input type="number" data-field="testCasesPassed" min="0" /></div>
+            <div class="field"><label># Failed</label><input type="number" data-field="testCasesFailed" min="0" /></div>
+            <div class="field field-wide"><label>Test Comments</label><input type="text" data-field="comments" /></div>
+          </div>
         </div>
       </template>
     </section>
@@ -271,6 +296,13 @@
             </div>
             <div class="field"><label>Applies to</label><div class="site-tags" data-site-tags></div></div>
           </div>
+          <div class="grid grid-tsr-fields">
+            <div class="field"><label>Issue Type</label><input type="text" data-field="issueType" placeholder="Defect" /></div>
+            <div class="field"><label># Test Cases</label><input type="number" data-field="numTestCases" min="0" /></div>
+            <div class="field"><label># Passed</label><input type="number" data-field="testCasesPassed" min="0" /></div>
+            <div class="field"><label># Failed</label><input type="number" data-field="testCasesFailed" min="0" /></div>
+            <div class="field field-wide"><label>Test Comments</label><input type="text" data-field="comments" /></div>
+          </div>
         </div>
       </template>
     </section>
@@ -303,6 +335,10 @@
     <!-- Generate -->
     <section class="card generate-card">
       <div id="summaryPanel" class="summary-panel"></div>
+      <label class="tsr-toggle">
+        <input type="checkbox" id="generateTsrCheckbox" />
+        Also generate Test Summary Report
+      </label>
       <button type="button" id="generateBtn" class="btn btn-primary btn-large">Generate release notes</button>
       <div id="statusMsg" class="status-msg"></div>
       <div id="generatedFilesPanel" class="generated-files-panel hidden"></div>
@@ -380,7 +416,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=26"></script>
-<script src="app.js?v=26"></script>
+<script src="parsers.js?v=27"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

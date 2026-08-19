@@ -258,8 +258,28 @@ body {
   grid-template-columns: 1fr 2.3fr 0.8fr 0.8fr 1.1fr;
 }
 
+/* Test Summary Report fields: supplementary per-ticket data (issue type +
+   test-case counts) that most people won't need to touch unless they're
+   also generating a TSR. Visually distinct (smaller, muted, top border) so
+   it reads as secondary/optional without needing its own collapse toggle. */
+.grid-tsr-fields {
+  grid-template-columns: 1fr 0.85fr 0.85fr 0.85fr 1.6fr;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.grid-tsr-fields .field > label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, #6b7280);
+  min-height: 0;
+}
+.grid-tsr-fields input {
+  font-size: 13px;
+}
+
 @media (max-width: 720px) {
-  .grid-2, .grid-3, .grid-ticket-4, .grid-ticket-5 {
+  .grid-2, .grid-3, .grid-ticket-4, .grid-ticket-5, .grid-tsr-fields {
     grid-template-columns: 1fr;
   }
   .ticket-row {
@@ -455,6 +475,20 @@ body {
   align-items: center;
   gap: 12px;
   text-align: center;
+}
+
+.tsr-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.tsr-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .status-msg {

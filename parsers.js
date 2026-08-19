@@ -174,6 +174,10 @@ const HEADER_KEYWORDS = {
   datafix: ["datafix", "data fix"],
   assignee: ["assignee"],
   slno: ["sl no", "sl.no", "s.no", "sr no"],
+  numTestCases: ["number of test cases", "num test cases", "test cases", "# test cases", "# of test cases"],
+  testCasesPassed: ["test cases passed", "tc passed", "# passed", "passed"],
+  testCasesFailed: ["test cases failed", "tc failed", "# failed", "failed"],
+  comments: ["comments", "comment", "remarks", "notes"],
 };
 
 function normalizeHeaderCell(cell) {
@@ -289,12 +293,17 @@ function parseTicketPaste(text) {
     const section = decideSection(rec.issueType, rec.subType, rec.targetSection);
     results.push({
       section,
+      issueType: rec.issueType || "",
       key: rec.key || "",
       summary: rec.summary || "",
       priority: rec.priority || "Medium",
       type: rec.subType || "",
       datafix: rec.datafix ? (/yes/i.test(rec.datafix) ? "Yes" : "No") : "No",
       sites: parseSitesToken(rec.sites || ""),
+      numTestCases: rec.numTestCases || "",
+      testCasesPassed: rec.testCasesPassed || "",
+      testCasesFailed: rec.testCasesFailed || "",
+      comments: rec.comments || "",
     });
   });
 
