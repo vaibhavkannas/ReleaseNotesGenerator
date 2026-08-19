@@ -763,6 +763,14 @@ function moveTicketRow(rowEl, fromKey, toKey) {
     const input = rowEl.querySelector(`[data-field="${f}"]`);
     if (input) record[f] = input.value;
   });
+  // TSR_EXTRA_FIELDS (issueType, test-case counts, comments) exist
+  // identically on every section's row template regardless of which
+  // section-specific rowFields it has -- these were being silently
+  // dropped on move since only fromCfg.rowFields was copied above.
+  TSR_EXTRA_FIELDS.forEach(f => {
+    const input = rowEl.querySelector(`[data-field="${f}"]`);
+    if (input) record[f] = input.value;
+  });
   record.sites = Array.from(rowEl.querySelectorAll("[data-site-tags] input:checked")).map(i => i.value);
   if (rowEl.dataset.parsedSites) {
     try { record.parsedSites = JSON.parse(rowEl.dataset.parsedSites); } catch (e) { /* ignore malformed */ }
