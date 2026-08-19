@@ -128,6 +128,23 @@ _old_dxa_dya = 'w:dxaOrig="1376" w:dyaOrig="893"'
 _new_dxa_dya = 'w:dxaOrig="2347" w:dyaOrig="1500"'
 assert data.count(_old_dxa_dya) == 1, "OLE object dxaOrig/dyaOrig not found in expected form"
 data = data.replace(_old_dxa_dya, _new_dxa_dya)
+
+# ==== "Risk and Mitigations with status" table: drop one empty row ====
+# Shipped with 4 blank data rows; reduced to 3 per request. The heading text
+# also appears once earlier in the Table of Contents, so anchor on the
+# SECOND occurrence (the real heading immediately before the actual table).
+_risk_idx1 = data.find('Risk and Mitigations with status')
+_risk_idx2 = data.find('Risk and Mitigations with status', _risk_idx1 + 1)
+assert _risk_idx1 != -1 and _risk_idx2 != -1, "Risk and Mitigations heading not found twice (TOC + body) as expected"
+_risk_tbl_start = data.find('<w:tbl>', _risk_idx2)
+_risk_tbl_end = data.find('</w:tbl>', _risk_tbl_start) + len('</w:tbl>')
+risk_table = data[_risk_tbl_start:_risk_tbl_end]
+risk_rows = re.findall(r'<w:tr .*?</w:tr>', risk_table, re.S)
+assert len(risk_rows) == 5, f"Risk table: expected 1 header + 4 empty rows, got {len(risk_rows)}"
+last_empty_row = risk_rows[-1]
+assert data.count(last_empty_row) == 1, "Risk table: last empty row isn't uniquely identifiable"
+data = data.replace(last_empty_row, '', 1)
+
 open(path, 'w', encoding='utf-8').write(data)
 
 rels_path = 'unpacked/word/_rels/document.xml.rels'

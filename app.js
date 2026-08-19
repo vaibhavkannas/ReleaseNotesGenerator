@@ -1111,7 +1111,7 @@ async function buildDocxForSite(templateArrayBuffer, site, sections, siteValues,
 
 // ---------- Test Summary Report (TSR) generation ----------
 
-const TSR_TEMPLATE_VERSION = 2;
+const TSR_TEMPLATE_VERSION = 3;
 const TSR_TEMPLATE_URL = `assets/tsr_master_template.docx?v=${TSR_TEMPLATE_VERSION}`;
 
 // Replaces all data rows in the embedded xlsx's sheet1.xml with fresh rows
