@@ -1201,17 +1201,20 @@ function drawTsrIconPng(iconImage, filename) {
   });
 }
 
-// Gathers every ticket across all 4 sections (unlike Release Notes, the TSR
-// isn't per-site -- it's one combined test-coverage record for the release).
+// Gathers every ticket across all sections EXCEPT Business Configuration
+// (excluded per explicit instruction -- those tickets shouldn't appear in
+// the TSR's test-case Excel at all). Unlike Release Notes, the TSR isn't
+// per-site -- it's one combined test-coverage record for the release.
 function collectAllTicketsForTsr() {
   const tickets = [];
   Object.keys(SECTION_CONFIG).forEach(sectionKey => {
+    if (sectionKey === "bizconfig") return;
     collectRows(sectionKey).forEach(r => {
       tickets.push({
         issueType: r.data.issueType || SECTION_DEFAULT_ISSUE_TYPE[sectionKey] || "",
         key: r.data.key || "",
         summary: r.data.summary || "",
-        priority: r.data.priority || "", // bizconfig rows have no priority field; left blank
+        priority: r.data.priority || "",
         numTestCases: r.data.numTestCases || "",
         testCasesPassed: r.data.testCasesPassed || "",
         testCasesFailed: r.data.testCasesFailed || "",
