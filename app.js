@@ -467,12 +467,26 @@ function renderTsrTotalsPreview() {
 // now defaulted to today on every fresh load regardless of any real input.
 function isFormStateMeaningful(state) {
   if (!state) return false;
+  // Deviating from the default site selection (Core only) is itself a
+  // deliberate choice worth not losing on a refresh, even before anything
+  // else has been filled in.
+  const sites = state.sites || [];
+  if (sites.length !== 1 || sites[0] !== "Core") return true;
   const sections = state.sections || {};
   if (Object.values(sections).some(rows => Array.isArray(rows) && rows.length > 0)) return true;
   const siteDetails = state.siteDetails || {};
+  const today = todayIso();
   for (const site of Object.keys(siteDetails)) {
     const d = siteDetails[site] || {};
     if (d.cdVersionRaw || d.productVersion || d.fxVersion) return true;
+    // The date field is defaulted to today automatically (see
+    // buildSiteDetailCards), so only a date that's been deliberately
+    // changed away from today counts as meaningful -- otherwise every
+    // single fresh session would trivially "pass" this check via the date
+    // alone, defeating the whole point of it.
+    if (d.releaseDateIso && d.releaseDateIso !== today) return true;
+    if (d.releaseType && d.releaseType !== "Full Release") return true;
+    if (d.hotfix && d.hotfix !== "No") return true;
     if (d.pasteText && d.pasteText.trim() && d.pasteText.trim() !== pasteDetailsPlaceholderText()) return true;
     if (d.rrp && Object.values(d.rrp).some(v => v === "Yes")) return true;
   }
