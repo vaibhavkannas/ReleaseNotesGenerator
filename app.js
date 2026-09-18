@@ -3,7 +3,7 @@
 // Bump this whenever assets/master_template.docx changes -- without it,
 // a browser or CDN cache can keep serving a stale template indefinitely,
 // since (unlike the CSS/JS below) this file was never cache-busted before.
-const TEMPLATE_VERSION = 15;
+const TEMPLATE_VERSION = 16;
 const TEMPLATE_URL = `assets/master_template.docx?v=${TEMPLATE_VERSION}`;
 
 const SITES = ["Core", "Partner Portal", "Customer Portal"];
@@ -1239,6 +1239,33 @@ function escapeHtml(str) {
 
 // ---------- Template engine ----------
 
+// Business Configuration's table and "No RBS Impact" NA text (handled by
+// fillSection above like any other section) are a strict either/or based on
+// whether the site has ANY ticket at all. This handles a second, independent
+// condition on top of that: even when the table IS shown (1+ tickets for
+// this site), add a "No RBS Impact" note alongside it if none of those
+// tickets are actually RBS-type (e.g. all EBC) -- since "Business
+// Configuration" covers RBS, EBC, and other types together, having *some*
+// ticket there doesn't mean RBS itself was touched. Older or custom
+// templates that predate this block simply won't have this note added,
+// rather than failing -- this is additive, not load-bearing like the
+// table/NA blocks fillSection requires.
+function applyBizConfigRbsNote(xml, siteRows) {
+  const startTag = "<!--BLOCK:BIZCONFIG:RBS_NOTE_START-->";
+  const endTag = "<!--BLOCK:BIZCONFIG:RBS_NOTE_END-->";
+  const start = xml.indexOf(startTag);
+  if (start === -1) return xml;
+  const end = xml.indexOf(endTag) + endTag.length;
+
+  const hasTickets = siteRows && siteRows.length > 0;
+  const hasRbsTicket = hasTickets && siteRows.some(r => (r.data.type || "").trim().toLowerCase() === "rbs");
+  const keepNote = hasTickets && !hasRbsTicket;
+
+  const block = xml.substring(start, end);
+  const replacement = keepNote ? block.split(startTag).join("").split(endTag).join("") : "";
+  return xml.substring(0, start) + replacement + xml.substring(end);
+}
+
 function fillSection(xml, key, rows) {
   const tableStartTag = `<!--BLOCK:${key}:TABLE_START-->`;
   const tableEndTag = `<!--BLOCK:${key}:TABLE_END-->`;
@@ -1299,6 +1326,15 @@ async function buildDocxForSite(templateArrayBuffer, site, sections, siteValues,
     });
     xml = fillSection(xml, sectionKey.toUpperCase(), tokenRows);
   });
+
+  // Business Configuration's "No RBS Impact" note is a separate, additional
+  // block from the table/NA choice above: it should appear whenever this
+  // site has at least one Business Configuration ticket but none of them
+  // are RBS-type (e.g. EBC-only), sitting alongside the real ticket table
+  // rather than replacing it -- and should NOT appear when there are no
+  // tickets at all (the NA block already says "No RBS Impact" by itself in
+  // that case) or when an RBS ticket genuinely is present.
+  xml = applyBizConfigRbsNote(xml, sections.bizconfig.filter(r => r.sites.includes(site)));
 
   const version = splitVersion(siteValues.cdVersionRaw);
   const scalarTokens = {

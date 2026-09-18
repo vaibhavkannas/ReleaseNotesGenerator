@@ -62,8 +62,16 @@ table_block = '<!--BLOCK:BIZCONFIG:TABLE_START-->' + new_table + '<!--BLOCK:BIZC
 # doc (Business Config always ships with real content) -- hand-authored, as before.
 na_para = '<w:p w:rsidRPr="00860B61" w:rsidR="001C6D58" w:rsidP="007E756C" w:rsidRDefault="001C6D58" w14:paraId="62FB2601" w14:textId="0F9C7601"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>No RBS Impact</w:t></w:r></w:p>'
 na_block = '<!--BLOCK:BIZCONFIG:NA_START-->' + na_para + '<!--BLOCK:BIZCONFIG:NA_END-->'
+# Separate, additional block (independent of the table/NA either-or above):
+# a "No RBS Impact" note that app.js conditionally keeps when this site has
+# Business Configuration tickets but none of them are RBS-type (e.g.
+# EBC-only), sitting alongside the real ticket table rather than replacing
+# it. Reuses the same visual style as the NA paragraph above, with a fresh
+# paraId/textId to avoid colliding with it.
+rbs_note_para = '<w:p w:rsidRPr="00860B61" w:rsidR="001C6D58" w:rsidP="007E756C" w:rsidRDefault="001C6D58" w14:paraId="62FB2605" w14:textId="0F9C7605"><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>No RBS Impact</w:t></w:r></w:p>'
+rbs_note_block = '<!--BLOCK:BIZCONFIG:RBS_NOTE_START-->' + rbs_note_para + '<!--BLOCK:BIZCONFIG:RBS_NOTE_END-->'
 assert data.count(table) == 1
-data = data.replace(table, table_block + na_block)
+data = data.replace(table, table_block + na_block + rbs_note_block)
 
 # ==== Code Drop Defects (bullet + table <-> NA) ====
 # Do this BEFORE Requirements, so we can reuse its pristine table structure
