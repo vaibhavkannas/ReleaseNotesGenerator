@@ -336,6 +336,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("templateFile").addEventListener("change", onTemplateFileSelected);
 
+  document.getElementById("downloadTemplateBtn").addEventListener("click", onDownloadBundledTemplate);
+
   document.getElementById("parseBtn").addEventListener("click", onParseTickets);
   document.getElementById("copyTicketTemplateBtn").addEventListener("click", onInsertExampleRows);
   document.getElementById("copyGridBtn").addEventListener("click", onCopyGrid);
@@ -636,6 +638,32 @@ async function onTemplateFileSelected(e) {
     }
   }
   renderCustomTemplateStatus(file.name, remember);
+}
+
+// Lets someone grab the app's own default Release Notes template as a
+// starting point for a custom one -- edit it in Word, then use "Use a
+// different template" to upload the result. Always fetches the true
+// bundled template directly (bypassing uploadedTemplateBuffer even if a
+// custom one is currently active), since the whole point is a known-good
+// baseline to build from, not whatever happens to be in use right now.
+async function onDownloadBundledTemplate() {
+  const btn = document.getElementById("downloadTemplateBtn");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Downloading…";
+  try {
+    const resp = await fetch(TEMPLATE_URL);
+    if (!resp.ok) throw new Error(`Could not load the bundled template (HTTP ${resp.status}).`);
+    const buffer = await resp.arrayBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    saveAs(blob, "FOCUS_Release_Notes_Bundled_Template.docx");
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "Couldn't download the bundled template. Try refreshing the page and trying again.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 // ---------- Per-site release detail cards ----------
