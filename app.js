@@ -240,10 +240,48 @@ function jiraFetchBookmarklet(appUrl) {
   var appWin = null;
   try { appWin = window.open(appUrl, "_blank"); } catch (e) { appWin = null; }
   var rows = [];
+  // Extra Jira fields looked up BY NAME (field ids differ per Jira site). Each
+  // group becomes one column, headed with a label the grid already understands.
+  // A group is skipped when no field with one of its names exists.
+  var groups = [
+    { label: "Data Fix", names: ["data fix", "datafix"], ids: [] },
+    { label: "BA SPOC", names: ["ba spoc"], ids: [] },
+    { label: "Applies To", names: ["applies to"], ids: [] }
+  ];
   function q(s) { return '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"'; }
+  function flat(v) {
+    if (v == null) return "";
+    if (Array.isArray(v)) return v.map(flat).filter(Boolean).join(", ");
+    if (typeof v === "object") {
+      if (v.type === "doc") {
+        var out = [];
+        (function walk(n) { if (n.text) out.push(n.text); (n.content || []).forEach(walk); })(v);
+        return out.join(" ");
+      }
+      var s = v.value || v.displayName || v.name || "";
+      return v.child ? s + " > " + flat(v.child) : s;
+    }
+    return String(v);
+  }
+  function loadExtras() {
+    return fetch(base + "/rest/api/3/field", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) {
+        list.forEach(function (f) {
+          var n = String(f.name || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+          groups.forEach(function (g) { if (g.names.indexOf(n) >= 0) g.ids.push(f.id); });
+        });
+      })
+      .catch(function () {});
+  }
+  function fieldList() {
+    var ids = ["summary", "priority", "issuetype"];
+    groups.forEach(function (g) { ids = ids.concat(g.ids); });
+    return ids.join(",");
+  }
   function page(token) {
     var url = base + "/rest/api/3/search/jql?jql=" + encodeURIComponent(jql) +
-      "&maxResults=100&fields=summary,priority,issuetype" +
+      "&maxResults=100&fields=" + encodeURIComponent(fieldList()) +
       (token ? "&nextPageToken=" + encodeURIComponent(token) : "");
     return fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(function (r) {
@@ -255,7 +293,14 @@ function jiraFetchBookmarklet(appUrl) {
       .then(function (d) {
         (d.issues || []).forEach(function (i) {
           var f = i.fields || {};
-          rows.push([f.issuetype && f.issuetype.name, i.key, f.summary, f.priority && f.priority.name].map(q).join("\t"));
+          var cells = [f.issuetype && f.issuetype.name, i.key, f.summary, f.priority && f.priority.name];
+          groups.forEach(function (g) {
+            if (!g.ids.length) return;
+            var val = "";
+            g.ids.forEach(function (id) { if (!val) val = flat(f[id]); });
+            cells.push(val);
+          });
+          rows.push(cells.map(q).join("\t"));
         });
         if (d.nextPageToken && !d.isLast && (d.issues || []).length) return page(d.nextPageToken);
       });
@@ -283,8 +328,10 @@ function jiraFetchBookmarklet(appUrl) {
     btns[1].onclick = function () { box.remove(); };
     document.body.appendChild(box);
   }
-  page("").then(function () {
-    var text = ["Issue Type", "Issue Key", "Summary", "Priority"].map(q).join("\t") + "\n" + rows.join("\n");
+  loadExtras().then(function () { return page(""); }).then(function () {
+    var head = ["Issue Type", "Issue Key", "Summary", "Priority"];
+    groups.forEach(function (g) { if (g.ids.length) head.push(g.label); });
+    var text = head.map(q).join("\t") + "\n" + rows.join("\n");
     var fallback = "Could not reach the app tab. Copy, then paste into the grid in Release Notes Generator.";
     if (!appWin) { showBox(text, fallback); return; }
     var origin = "*";
@@ -331,10 +378,15 @@ function onJiraMessage(ev) {
 function applyJiraTypeRules(rows) {
   const typeIdx = GRID_COLUMNS.indexOf("subType");
   const summaryIdx = GRID_COLUMNS.indexOf("summary");
+  const datafixIdx = GRID_COLUMNS.indexOf("datafix");
   rows.forEach(rec => {
-    if (rec[typeIdx]) return;
-    if (/\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
-    else if (/\bEBC\b/i.test(rec[summaryIdx])) rec[typeIdx] = "EBC";
+    if (!rec[typeIdx]) {
+      if (/\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
+      else if (/\bEBC\b/i.test(rec[summaryIdx])) rec[typeIdx] = "EBC";
+    }
+    // Datafix: Yes when the Jira "Data Fix" field says so OR the summary
+    // mentions a data fix. Anything else stays as imported (blank/No).
+    if (/data[\s-]?fix/i.test(rec[summaryIdx]) || /^\s*(yes|true|y)\b/i.test(rec[datafixIdx])) rec[datafixIdx] = "Yes";
   });
 }
 
