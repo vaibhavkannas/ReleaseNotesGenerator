@@ -325,13 +325,16 @@ function onJiraMessage(ev) {
 }
 
 // Rules applied to Jira-imported rows (grid column arrays, GRID_COLUMNS order).
-// A ticket whose summary mentions RBS as a whole word is an RBS ticket. Only
-// fills an empty Type, so a value already in the grid is never overwritten.
+// A summary mentioning RBS (else EBC) as a whole word sets Type to RBS (EBC);
+// RBS wins when both appear. Only fills an empty Type, so a value already in
+// the grid is never overwritten.
 function applyJiraTypeRules(rows) {
   const typeIdx = GRID_COLUMNS.indexOf("subType");
   const summaryIdx = GRID_COLUMNS.indexOf("summary");
   rows.forEach(rec => {
-    if (!rec[typeIdx] && /\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
+    if (rec[typeIdx]) return;
+    if (/\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
+    else if (/\bEBC\b/i.test(rec[summaryIdx])) rec[typeIdx] = "EBC";
   });
 }
 

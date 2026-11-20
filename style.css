@@ -735,7 +735,11 @@ body {
 /* --- Excel-style editable grid (ticket paste importer) --- */
 
 .excel-grid-scroll {
-  overflow-x: auto;
+  /* Bounded height keeps the horizontal scrollbar on screen even with 50+
+     rows (it used to sit at the very bottom of a tall grid), and the sticky
+     header stays visible while scrolling down. */
+  overflow: auto;
+  max-height: 65vh;
   border: 1.5px solid #e8cd7a;
   border-radius: 8px;
   background: #fffef9;
@@ -758,6 +762,7 @@ body {
   white-space: nowrap;
   position: sticky;
   top: 0;
+  z-index: 2;
 }
 
 .excel-grid-rowaction-col {
@@ -785,6 +790,13 @@ body {
 
 .excel-grid td[data-col="summary"] {
   min-width: 220px;
+}
+
+.excel-grid td[data-col="numTestCases"],
+.excel-grid td[data-col="testCasesPassed"],
+.excel-grid td[data-col="testCasesFailed"],
+.excel-grid td[data-col="datafix"] {
+  min-width: 60px;
 }
 
 .excel-grid tr:nth-child(even) td[contenteditable="true"] {
