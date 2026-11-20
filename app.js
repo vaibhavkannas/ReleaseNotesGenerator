@@ -430,6 +430,15 @@ function importTsvIntoGrid(text, sourceLabel) {
     return rec;
   });
   applyJiraTypeRules(data);
+  // Default order for the BA: by BA SPOC, then Issue Type (A-Z, blanks last).
+  // Grid order only; the sections below are still ordered by priority.
+  const spocIdx = GRID_COLUMNS.indexOf("baSpoc");
+  const itIdx = GRID_COLUMNS.indexOf("issueType");
+  const cmp = (a, b) => {
+    if (!a !== !b) return a ? -1 : 1;
+    return a.localeCompare(b, undefined, { sensitivity: "base" });
+  };
+  data.sort((x, y) => cmp(x[spocIdx], y[spocIdx]) || cmp(x[itIdx], y[itIdx]));
   setGridRowsData(data);
   scheduleFormChangeHandlers();
   const st = document.getElementById("pasteStatus");
