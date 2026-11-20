@@ -324,6 +324,17 @@ function onJiraMessage(ev) {
   importTsvIntoGrid(d.text, "Jira");
 }
 
+// Rules applied to Jira-imported rows (grid column arrays, GRID_COLUMNS order).
+// A ticket whose summary mentions RBS as a whole word is an RBS ticket. Only
+// fills an empty Type, so a value already in the grid is never overwritten.
+function applyJiraTypeRules(rows) {
+  const typeIdx = GRID_COLUMNS.indexOf("subType");
+  const summaryIdx = GRID_COLUMNS.indexOf("summary");
+  rows.forEach(rec => {
+    if (!rec[typeIdx] && /\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
+  });
+}
+
 // Replaces the grid with a header-mapped table of text (same mapping as paste).
 function importTsvIntoGrid(text, sourceLabel) {
   const rows = parseDelimitedRows(text, "\t").map(r => r.map(cleanCell));
@@ -338,6 +349,7 @@ function importTsvIntoGrid(text, sourceLabel) {
     });
     return rec;
   });
+  applyJiraTypeRules(data);
   setGridRowsData(data);
   scheduleFormChangeHandlers();
   const st = document.getElementById("pasteStatus");
