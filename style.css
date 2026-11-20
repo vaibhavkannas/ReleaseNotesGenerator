@@ -1031,3 +1031,8 @@ body {
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+.jira-import { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--border, #d0d7de); border-radius: 8px; }
+.jira-import summary { cursor: pointer; font-weight: 600; }
+.jira-import ol { margin: 8px 0 0 18px; padding: 0; }
+.jira-import li { margin-bottom: 6px; }

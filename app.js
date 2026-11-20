@@ -220,6 +220,144 @@ function setGridRowsData(rows) {
   while (body.children.length < GRID_MIN_ROWS) addGridRow(false);
 }
 
+// ---------------- Jira JQL import (bookmarklet) ----------------
+// jiraFetchBookmarklet runs ON the Jira tab, inside the user's logged-in
+// session, so no token or proxy is needed. It fetches every page of results
+// for a JQL, builds tab-separated text with a header row (the grid's own
+// paste path then maps it) and shows a box with a Copy button. It must stay
+// self-contained: it is serialised with toString() into the bookmark URL.
+function jiraFetchBookmarklet(appUrl) {
+  var base = location.origin;
+  if (!/\.atlassian\.net$/.test(location.hostname)) {
+    alert("Open a Jira page (https://odessainc.atlassian.net/...) first, then click this bookmark there.\nYou are on: " + location.origin);
+    return;
+  }
+  var jql = new URLSearchParams(location.search).get("jql") || "";
+  jql = prompt("JQL query to import into Release Notes Generator:", jql);
+  if (!jql || !jql.trim()) return;
+  var appWin = null;
+  try { appWin = window.open(appUrl, "_blank"); } catch (e) { appWin = null; }
+  var rows = [];
+  function q(s) { return '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"'; }
+  function page(token) {
+    var url = base + "/rest/api/3/search/jql?jql=" + encodeURIComponent(jql) +
+      "&maxResults=100&fields=summary,priority,issuetype" +
+      (token ? "&nextPageToken=" + encodeURIComponent(token) : "");
+    return fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (t) { throw new Error("Jira returned " + r.status + ": " + t.slice(0, 300)); });
+        }
+        return r.json();
+      })
+      .then(function (d) {
+        (d.issues || []).forEach(function (i) {
+          var f = i.fields || {};
+          rows.push([f.issuetype && f.issuetype.name, i.key, f.summary, f.priority && f.priority.name].map(q).join("\t"));
+        });
+        if (d.nextPageToken && !d.isLast && (d.issues || []).length) return page(d.nextPageToken);
+      });
+  }
+  function showBox(text, note) {
+    var old = document.getElementById("frng-jira-box");
+    if (old) old.remove();
+    var box = document.createElement("div");
+    box.id = "frng-jira-box";
+    box.style.cssText = "position:fixed;top:20px;right:20px;z-index:2147483647;width:440px;background:#fff;color:#172b4d;border:2px solid #0052cc;border-radius:8px;padding:14px;font:14px Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+    box.innerHTML = '<b></b><textarea readonly style="width:100%;height:90px;margin:8px 0;font:12px monospace"></textarea>' +
+      '<button style="padding:6px 12px;margin-right:8px;cursor:pointer">Copy</button><button style="padding:6px 12px;cursor:pointer">Close</button>' +
+      '<div style="margin-top:8px;font-size:12px"></div>';
+    box.lastChild.textContent = note;
+    box.querySelector("b").textContent = rows.length + " ticket(s) fetched";
+    var ta = box.querySelector("textarea");
+    ta.value = text;
+    var btns = box.querySelectorAll("button");
+    btns[0].onclick = function () {
+      ta.select();
+      var done = function () { btns[0].textContent = "Copied"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { document.execCommand("copy"); done(); });
+      else { document.execCommand("copy"); done(); }
+    };
+    btns[1].onclick = function () { box.remove(); };
+    document.body.appendChild(box);
+  }
+  page("").then(function () {
+    var text = ["Issue Type", "Issue Key", "Summary", "Priority"].map(q).join("\t") + "\n" + rows.join("\n");
+    var fallback = "Could not reach the app tab. Copy, then paste into the grid in Release Notes Generator.";
+    if (!appWin) { showBox(text, fallback); return; }
+    var origin = "*";
+    try { origin = new URL(appUrl).origin; if (origin === "null") origin = "*"; } catch (e) { origin = "*"; }
+    var acked = false, tries = 0;
+    window.addEventListener("message", function (ev) {
+      if (ev.data && ev.data.type === "frng-jira-ack") acked = true;
+    });
+    var timer = setInterval(function () {
+      tries++;
+      if (acked) { clearInterval(timer); return; }
+      if (tries > 40) { clearInterval(timer); showBox(text, fallback); return; }
+      try { appWin.postMessage({ type: "frng-jira-tickets", text: text, count: rows.length }, origin); } catch (e) {}
+    }, 500);
+  }).catch(function (e) {
+    if (appWin) { try { appWin.close(); } catch (x) {} }
+    alert("Jira import failed: " + e.message + "\nPage: " + location.origin);
+  });
+}
+
+function getJiraBookmarkletCode() {
+  const appUrl = location.href.split("#")[0].split("?")[0];
+  return "javascript:" + encodeURIComponent("(" + jiraFetchBookmarklet.toString() + ")(" + JSON.stringify(appUrl) + ")");
+}
+
+// Receives tickets posted by the bookmarklet from a Jira tab. Only accepted
+// from *.atlassian.net, and only when the message has the expected shape.
+function onJiraMessage(ev) {
+  const d = ev.data;
+  if (!d || d.type !== "frng-jira-tickets" || typeof d.text !== "string") return;
+  let host = "";
+  try { host = new URL(ev.origin).hostname; } catch (e) { return; }
+  if (!/\.atlassian\.net$/.test(host)) return;
+  if (ev.source) ev.source.postMessage({ type: "frng-jira-ack" }, ev.origin);
+  if (window.__jiraImported === d.text) return; // retries after the first delivery
+  window.__jiraImported = d.text;
+  importTsvIntoGrid(d.text, "Jira");
+}
+
+// Replaces the grid with a header-mapped table of text (same mapping as paste).
+function importTsvIntoGrid(text, sourceLabel) {
+  const rows = parseDelimitedRows(text, "\t").map(r => r.map(cleanCell));
+  if (rows.length < 2 || !looksLikeHeader(rows[0])) return;
+  if (gridHasContent() && !confirm(`Replace the current grid with ${rows.length - 1} ticket(s) from ${sourceLabel}?`)) return;
+  const fieldMap = mapHeaderRow(rows[0]);
+  const data = rows.slice(1).map(cells => {
+    const rec = GRID_COLUMNS.map(() => "");
+    cells.forEach((val, i) => {
+      const idx = GRID_COLUMNS.indexOf(fieldMap[i]);
+      if (idx >= 0) rec[idx] = val;
+    });
+    return rec;
+  });
+  setGridRowsData(data);
+  scheduleFormChangeHandlers();
+  const st = document.getElementById("pasteStatus");
+  if (st) st.textContent = `Imported ${data.length} ticket(s) from ${sourceLabel}. Review, then click Parse.`;
+}
+
+function initJiraImport() {
+  window.addEventListener("message", onJiraMessage);
+  const link = document.getElementById("jiraBookmarklet");
+  if (!link) return;
+  link.setAttribute("href", getJiraBookmarkletCode());
+  link.addEventListener("click", e => {
+    e.preventDefault();
+    alert("Drag this button to your bookmarks bar, then click it while on a Jira page. Clicking it here does nothing.");
+  });
+  document.getElementById("copyBookmarkletBtn").addEventListener("click", () => {
+    const code = getJiraBookmarkletCode();
+    const done = () => { document.getElementById("copyBookmarkletBtn").textContent = "Copied"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, () => {});
+  });
+}
+
 function handleGridPaste(e) {
   const targetCell = e.target.closest("td[contenteditable]");
   if (!targetCell) return;
@@ -355,6 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("downloadTemplateBtn").addEventListener("click", onDownloadBundledTemplate);
 
+  initJiraImport();
   document.getElementById("parseBtn").addEventListener("click", onParseTickets);
   document.getElementById("copyTicketTemplateBtn").addEventListener("click", onInsertExampleRows);
   document.getElementById("copyGridBtn").addEventListener("click", onCopyGrid);

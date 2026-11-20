@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FOCUS Release Notes Generator</title>
-<link rel="stylesheet" href="style.css?v=46" />
+<link rel="stylesheet" href="style.css?v=49" />
 </head>
 <body>
 <div class="app">
@@ -77,6 +77,18 @@
         header row and all (we'll ignore it if you include one). The grid grows to fit what you paste, and
         we'll automatically sort tickets into the right section below, ordered by priority.
       </p>
+      <details class="jira-import" id="jiraImport">
+        <summary>Import from Jira with a JQL query</summary>
+        <ol class="hint">
+          <li>One-time: drag this button to your bookmarks bar (or right-click, copy link, add bookmark):
+            <a id="jiraBookmarklet" class="btn btn-secondary btn-sm" href="#" draggable="true">Fetch Jira tickets</a>
+            <button type="button" id="copyBookmarkletBtn" class="btn btn-secondary btn-sm">Copy bookmarklet code</button>
+          </li>
+          <li>Open any Jira page (odessainc.atlassian.net) while logged in and click the bookmark. It asks for the JQL (prefilled if your Jira search URL has one).</li>
+          <li>This app opens in a new tab with the grid already filled. Allow pop-ups for Jira if the browser asks. If the tab cannot be reached, a Copy box shows on the Jira page instead: copy it and paste into the grid.</li>
+        </ol>
+        <p class="hint">Fills Issue Type, Issue Key, Summary, Priority. Everything else stays for you to fill in. Nothing leaves your browser; no token is used.</p>
+      </details>
       <div class="paste-zone">
         <div class="paste-zone-label"><span class="pin">PASTE HERE</span> Excel rows</div>
         <div class="paste-actions" style="margin-top:0; margin-bottom:10px;">
@@ -423,7 +435,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="parsers.js?v=46"></script>
-<script src="app.js?v=46"></script>
+<script src="parsers.js?v=49"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>
