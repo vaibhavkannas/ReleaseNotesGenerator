@@ -372,9 +372,8 @@ function onJiraMessage(ev) {
 }
 
 // Rules applied to Jira-imported rows (grid column arrays, GRID_COLUMNS order).
-// A summary mentioning RBS (else EBC) as a whole word sets Type to RBS (EBC);
-// RBS wins when both appear. Only fills an empty Type, so a value already in
-// the grid is never overwritten.
+// Fills Datafix, Release Notes Section and (for Tasks) Type from the imported
+// ticket data. Only empty cells are filled; typed values are never overwritten.
 function applyJiraTypeRules(rows) {
   const typeIdx = GRID_COLUMNS.indexOf("subType");
   const summaryIdx = GRID_COLUMNS.indexOf("summary");
@@ -382,28 +381,37 @@ function applyJiraTypeRules(rows) {
   const sectionIdx = GRID_COLUMNS.indexOf("targetSection");
   const issueTypeIdx = GRID_COLUMNS.indexOf("issueType");
   rows.forEach(rec => {
-    if (!rec[typeIdx]) {
-      if (/\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
-      else if (/\bEBC\b/i.test(rec[summaryIdx])) rec[typeIdx] = "EBC";
-    }
+    const issueType = rec[issueTypeIdx] || "";
+    const summary = rec[summaryIdx] || "";
+
     // Datafix: Yes when the Jira "Data Fix" field says so OR the summary
     // mentions a data fix. Anything else stays as imported (blank/No).
-    if (/data[\s-]?fix/i.test(rec[summaryIdx]) || /^\s*(yes|true|y)\b/i.test(rec[datafixIdx])) rec[datafixIdx] = "Yes";
+    if (/data[\s-]?fix/i.test(summary) || /^\s*(yes|true|y)\b/i.test(rec[datafixIdx])) rec[datafixIdx] = "Yes";
 
-    // Release Notes Section: filled only where we are sure, and only when
-    // empty. Everything else stays blank so the app's own routing decides.
-    //  - Requirement issue type            -> Requirements
-    //  - Bug (not RBS/EBC)                 -> Code Drop Defects
-    //  - RBS/EBC type on a non-Bug ticket  -> Business Configuration
-    // A Bug that mentions RBS/EBC is left blank (could be either).
-    // Tasks are left blank: a Task may be a Portfolio/User Config ticket.
-    if (!rec[sectionIdx]) {
-      const isBug = /bug/i.test(rec[issueTypeIdx]);
-      const isBizType = /^(rbs|ebc)$/i.test(rec[typeIdx]);
-      if (isBizType) { if (!isBug) rec[sectionIdx] = SECTION_LABELS.bizconfig; }
-      else if (isBug) rec[sectionIdx] = SECTION_LABELS.cdd;
-      else if (/requirement/i.test(rec[issueTypeIdx])) rec[sectionIdx] = SECTION_LABELS.req;
+    // Release Notes Section rules (only fill empty cells, never overwrite):
+    //  - Bug                    -> Code Drop Defects, always
+    //  - Requirement / CR       -> Requirements, always
+    //  - Task                   -> Business Configuration when the summary
+    //                              mentions RBS, EBC/EBS or Config; otherwise
+    //                              Tasks Completed
+    //  - any other issue type   -> left blank for the app's own routing
+    // Type (RBS/EBC) is only set for Tasks, so Bugs and Requirements never
+    // trigger the Business Configuration table or the "No RBS Impact" note.
+    let section = "";
+    if (/bug/i.test(issueType)) section = SECTION_LABELS.cdd;
+    else if (/requirement|change request|^\s*cr\s*$/i.test(issueType)) section = SECTION_LABELS.req;
+    else if (/task/i.test(issueType)) {
+      let type = "";
+      if (/\bRBS\b/i.test(summary)) type = "RBS";
+      else if (/\bEB[CS]\b/i.test(summary)) type = "EBC";
+      if (type || /\bconfig(uration)?\b/i.test(summary)) {
+        section = SECTION_LABELS.bizconfig;
+        if (type && !rec[typeIdx]) rec[typeIdx] = type;
+      } else {
+        section = SECTION_LABELS.tasks;
+      }
     }
+    if (section && !rec[sectionIdx]) rec[sectionIdx] = section;
   });
 }
 
