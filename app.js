@@ -379,6 +379,8 @@ function applyJiraTypeRules(rows) {
   const typeIdx = GRID_COLUMNS.indexOf("subType");
   const summaryIdx = GRID_COLUMNS.indexOf("summary");
   const datafixIdx = GRID_COLUMNS.indexOf("datafix");
+  const sectionIdx = GRID_COLUMNS.indexOf("targetSection");
+  const issueTypeIdx = GRID_COLUMNS.indexOf("issueType");
   rows.forEach(rec => {
     if (!rec[typeIdx]) {
       if (/\bRBS\b/i.test(rec[summaryIdx])) rec[typeIdx] = "RBS";
@@ -387,6 +389,21 @@ function applyJiraTypeRules(rows) {
     // Datafix: Yes when the Jira "Data Fix" field says so OR the summary
     // mentions a data fix. Anything else stays as imported (blank/No).
     if (/data[\s-]?fix/i.test(rec[summaryIdx]) || /^\s*(yes|true|y)\b/i.test(rec[datafixIdx])) rec[datafixIdx] = "Yes";
+
+    // Release Notes Section: filled only where we are sure, and only when
+    // empty. Everything else stays blank so the app's own routing decides.
+    //  - Requirement issue type            -> Requirements
+    //  - Bug (not RBS/EBC)                 -> Code Drop Defects
+    //  - RBS/EBC type on a non-Bug ticket  -> Business Configuration
+    // A Bug that mentions RBS/EBC is left blank (could be either).
+    // Tasks are left blank: a Task may be a Portfolio/User Config ticket.
+    if (!rec[sectionIdx]) {
+      const isBug = /bug/i.test(rec[issueTypeIdx]);
+      const isBizType = /^(rbs|ebc)$/i.test(rec[typeIdx]);
+      if (isBizType) { if (!isBug) rec[sectionIdx] = SECTION_LABELS.bizconfig; }
+      else if (isBug) rec[sectionIdx] = SECTION_LABELS.cdd;
+      else if (/requirement/i.test(rec[issueTypeIdx])) rec[sectionIdx] = SECTION_LABELS.req;
+    }
   });
 }
 
