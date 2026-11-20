@@ -207,7 +207,7 @@ function getGridText() {
   const lines = [GRID_HEADER_ROW.join("\t")];
   getGridRowsData().forEach(cells => {
     if (cells.every(c => c === "")) return;
-    lines.push(cells.join("\t"));
+    lines.push(cells.map(c => c.replace(/[\t\r\n]+/g, " ")).join("\t"));
   });
   return lines.join("\n");
 }
@@ -229,13 +229,23 @@ function handleGridPaste(e) {
   if (!text) return;
   e.preventDefault();
 
-  let lines = text.replace(/\r/g, "").split("\n");
-  while (lines.length && lines[lines.length - 1] === "") lines.pop();
-  if (lines.length === 0) return;
+  // Tab-separated (Excel/Sheets) unless there's no tab at all and the first
+  // line is a comma-separated header row, i.e. a CSV. Parsed quote-aware: a
+  // cell Excel wraps in quotes (multi-line text, text containing quotes)
+  // stays ONE cell instead of being split into phantom rows/columns, which
+  // used to shift every column after it for the rest of the paste.
+  let delim = "\t";
+  if (!text.includes("\t")) {
+    const firstLine = text.replace(/\r/g, "").split("\n").find(l => l.trim() !== "") || "";
+    const commaCells = firstLine.split(",");
+    if (commaCells.length > 1 && looksLikeHeader(commaCells)) delim = ",";
+  }
+  let rows = parseDelimitedRows(text, delim).map(r => r.map(cleanCell));
+  if (rows.length === 0) return;
 
   // Plain single-value paste into one cell — no tabs/newlines to spread across cells.
-  if (lines.length === 1 && !lines[0].includes("\t")) {
-    targetCell.textContent = lines[0];
+  if (rows.length === 1 && rows[0].length === 1) {
+    targetCell.textContent = rows[0][0];
     scheduleFormChangeHandlers();
     return;
   }
@@ -248,35 +258,42 @@ function handleGridPaste(e) {
   // like a header, use it (same flexible matching the core parser uses,
   // handling synonyms and any column order); otherwise fall back to the same
   // best-effort fixed order the core parser assumes for headerless pastes.
-  const firstLineCells = splitLine(lines[0], detectDelimiter(lines[0]));
   let fieldMap; // index -> field name
-  if (looksLikeHeader(firstLineCells)) {
-    fieldMap = mapHeaderRow(firstLineCells);
-    lines = lines.slice(1);
+  const hasHeader = looksLikeHeader(rows[0]);
+  if (hasHeader) {
+    fieldMap = mapHeaderRow(rows[0]);
+    rows = rows.slice(1);
   } else {
     fieldMap = {};
     FALLBACK_FIELD_ORDER.forEach((field, i) => { fieldMap[i] = field; });
   }
-  if (lines.length === 0) return;
+  if (rows.length === 0) return;
 
   const body = document.getElementById("pasteGridBody");
-  let rows = Array.from(body.children);
+  const gridRows = Array.from(body.children);
   const startRow = targetCell.closest("tr");
-  const startRowIndex = rows.indexOf(startRow);
+  const startRowIndex = gridRows.indexOf(startRow);
 
-  lines.forEach((line, i) => {
+  rows.forEach((cells, i) => {
     const rowIndex = startRowIndex + i;
-    if (rowIndex >= rows.length) {
-      const newRow = addGridRow(false);
-      rows.push(newRow);
+    if (rowIndex >= gridRows.length) gridRows.push(addGridRow(false));
+    const targetRow = gridRows[rowIndex];
+    // With a header row the mapping is authoritative, so each pasted row is
+    // a complete record: wipe the row first. Otherwise any column the paste
+    // didn't supply (e.g. a Jira export has no test-case columns) would keep
+    // whatever the row held before -- example rows, or an earlier, different
+    // ticket -- and silently attach those stale values to the new ticket.
+    if (hasHeader) {
+      GRID_COLUMNS.forEach(col => {
+        const td = targetRow.querySelector(`td[data-col="${col}"]`);
+        if (td) td.textContent = "";
+      });
     }
-    const targetRow = rows[rowIndex];
-    const cells = splitLine(line, "\t");
     cells.forEach((val, colIdx) => {
       const field = fieldMap[colIdx];
       if (!field || !GRID_COLUMNS.includes(field)) return; // no matching grid column for this source column
       const td = targetRow.querySelector(`td[data-col="${field}"]`);
-      if (td) td.textContent = val.trim();
+      if (td) td.textContent = val;
     });
   });
 

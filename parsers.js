@@ -195,17 +195,117 @@ function splitLine(line, delim) {
   return line.split(delim);
 }
 
+// Collapses a cell to one clean line. Grid cells and docx table cells are
+// single-line, so line breaks inside a multi-line source cell (and stray
+// tabs) become a single space rather than being passed through raw.
+function cleanCell(value) {
+  return String(value == null ? "" : value).replace(/\s*\n\s*/g, " ").replace(/\t/g, " ").trim();
+}
+
+// Parses delimited text (tab or comma) the way Excel/Sheets/CSV actually
+// write it: a field that STARTS with a double quote runs until the matching
+// closing quote, so it may contain line breaks, the delimiter, and doubled
+// quotes ("") for a literal quote. Splitting on "\n" first -- what this used
+// to do -- turned every multi-line cell into extra phantom rows and shifted
+// every column after it. A quote in the middle of an unquoted field (5" pipe)
+// stays literal, and an opening quote with no closing quote is treated as
+// literal text rather than swallowing the rest of the paste.
+function parseDelimitedRows(text, delim) {
+  const src = String(text).replace(/\r\n?/g, "\n");
+  const rows = [];
+  let row = [];
+  let i = 0;
+  const n = src.length;
+  while (i <= n) {
+    let field = "";
+    if (src[i] === '"') {
+      let j = i + 1;
+      let closed = false;
+      let buf = "";
+      while (j < n) {
+        if (src[j] === '"') {
+          if (src[j + 1] === '"') { buf += '"'; j += 2; continue; }
+          closed = true;
+          break;
+        }
+        buf += src[j];
+        j++;
+      }
+      if (closed) {
+        field = buf;
+        i = j + 1;
+        // lenient: text glued onto a closed quote ("abc"def) is kept as-is
+        while (i < n && src[i] !== "\n" && !src.startsWith(delim, i)) { field += src[i]; i++; }
+      } else {
+        // no closing quote anywhere: keep the opening quote literally
+        let j2 = i;
+        while (j2 < n && src[j2] !== "\n" && !src.startsWith(delim, j2)) j2++;
+        field = src.slice(i, j2);
+        i = j2;
+      }
+    } else {
+      let j = i;
+      while (j < n && src[j] !== "\n" && !src.startsWith(delim, j)) j++;
+      field = src.slice(i, j);
+      i = j;
+    }
+    row.push(field);
+    if (i >= n) { rows.push(row); break; }
+    if (src[i] === "\n") { rows.push(row); row = []; i++; if (i >= n) break; continue; }
+    i += delim.length; // consume delimiter, next field
+    if (i >= n) { row.push(""); rows.push(row); break; }
+  }
+  // drop trailing fully-empty rows (Excel always ends the clipboard with a newline)
+  while (rows.length && rows[rows.length - 1].every(c => cleanCell(c) === "")) rows.pop();
+  return rows;
+}
+
+// Picks one delimiter for the whole paste. Tab wins if it appears anywhere
+// (Excel/Sheets clipboard), otherwise falls back to the first line's guess.
+function detectTableDelimiter(text) {
+  const clean = String(text).replace(/\r\n?/g, "\n");
+  const firstLine = clean.split("\n").find(l => l.trim() !== "") || "";
+  if (firstLine.includes("\t") || clean.includes("\t")) return "\t";
+  return detectDelimiter(firstLine);
+}
+
+// Full pipeline: text -> array of rows of cleaned cells. Regex delimiters
+// (runs of spaces from a copied table) have no quoting concept, so those
+// keep the old line-by-line behavior.
+function parseTableText(text) {
+  const delim = detectTableDelimiter(text);
+  if (delim instanceof RegExp) {
+    return String(text).replace(/\r/g, "").split("\n").filter(l => l.trim() !== "")
+      .map(l => l.split(delim).map(cleanCell));
+  }
+  return parseDelimitedRows(text, delim).map(r => r.map(cleanCell));
+}
+
 function mapHeaderRow(cells) {
   const map = {}; // index -> fieldName
-  cells.forEach((cell, i) => {
-    const norm = normalizeHeaderCell(cell);
+  const taken = new Set(); // fields already claimed by an earlier/better column
+  const norms = cells.map(normalizeHeaderCell);
+
+  // Pass 1: headers that are exactly a known synonym ("Summary", "Issue key")
+  // claim their field first, so a looser header like "Parent summary" can
+  // never steal it just because it comes later in the row.
+  norms.forEach((norm, i) => {
     if (!norm) return;
-    if (norm.includes("issue type")) { map[i] = "issueType"; return; }
+    if (norm === "issue type") { map[i] = "issueType"; taken.add("issueType"); return; }
     for (const field of Object.keys(HEADER_KEYWORDS)) {
-      if (field === "issueType") continue;
-      for (const kw of HEADER_KEYWORDS[field]) {
-        if (norm === kw || norm.includes(kw)) { map[i] = field; return; }
-      }
+      if (field === "issueType" || taken.has(field)) continue;
+      if (HEADER_KEYWORDS[field].includes(norm)) { map[i] = field; taken.add(field); return; }
+    }
+  });
+
+  // Pass 2: substring matches for whatever is still unmapped, still never
+  // overwriting a field another column already claimed (first column wins).
+  norms.forEach((norm, i) => {
+    if (!norm || map[i]) return;
+    if (norm.includes("issue type") && !taken.has("issueType")) { map[i] = "issueType"; taken.add("issueType"); return; }
+    for (const field of Object.keys(HEADER_KEYWORDS)) {
+      if (field === "issueType" || taken.has(field)) continue;
+      if (HEADER_KEYWORDS[field].some(kw => norm.includes(kw))) { map[i] = field; taken.add(field); return; }
     }
   });
   return map;
@@ -262,11 +362,8 @@ function decideSection(issueType, subType, targetSectionRaw) {
 const FALLBACK_FIELD_ORDER = ["issueType", "key", "summary", "assignee", "priority", "subType", "sites"];
 
 function parseTicketPaste(text) {
-  const lines = text.split(/\n/).map(l => l.replace(/\r$/, "")).filter(l => l.trim() !== "");
-  if (lines.length === 0) return [];
-
-  const delim = detectDelimiter(lines[0]);
-  const rows = lines.map(l => splitLine(l, delim).map(c => c.trim()));
+  const rows = parseTableText(text).filter(r => !r.every(c => c === ""));
+  if (rows.length === 0) return [];
 
   let headerMap = null;
   let dataRows = rows;
@@ -314,5 +411,6 @@ if (typeof module !== "undefined") {
   module.exports = {
     parseDateFlexible, parsePackagesText, parseReleaseParagraph,
     parseTicketPaste, decideSection, parseSitesToken, FALLBACK_FIELD_ORDER,
+    parseDelimitedRows, parseTableText, cleanCell, mapHeaderRow, looksLikeHeader,
   };
 }
