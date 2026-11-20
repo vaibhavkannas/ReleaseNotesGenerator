@@ -178,6 +178,7 @@ const HEADER_KEYWORDS = {
   testCasesPassed: ["test cases passed", "tc passed", "# passed", "passed"],
   testCasesFailed: ["test cases failed", "tc failed", "# failed", "failed"],
   comments: ["comments", "comment", "remarks", "notes"],
+  baSpoc: ["ba spoc", "ba spock", "spoc", "spock"], // BA-only note; parsed but never used in output
 };
 
 function normalizeHeaderCell(cell) {

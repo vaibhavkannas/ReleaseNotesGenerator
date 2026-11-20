@@ -56,8 +56,10 @@ const SECTION_LABELS = {
 
 // Columns in display order; data-col attributes on <th>/<td> must match these keys,
 // and these are exactly the field names parseTicketPaste()'s header-matching understands.
-const GRID_COLUMNS = ["issueType", "key", "summary", "priority", "targetSection", "subType", "datafix", "sites", "numTestCases", "testCasesPassed", "testCasesFailed", "comments"];
-const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Release Notes Section", "Type", "Datafix", "Applies To (Core/PP/CP)", "# Test Cases", "# Passed", "# Failed", "Comments"];
+const GRID_COLUMNS = ["issueType", "key", "summary", "priority", "targetSection", "subType", "datafix", "sites", "numTestCases", "testCasesPassed", "testCasesFailed", "comments", "baSpoc"];
+// baSpoc is a working note for the BA only: it lives in the grid (copy/draft/
+// autosave) but is never copied into the parsed sections or the documents.
+const GRID_HEADER_ROW = ["Issue Type", "Issue Key", "Summary", "Priority", "Release Notes Section", "Type", "Datafix", "Applies To (Core/PP/CP)", "# Test Cases", "# Passed", "# Failed", "Comments", "BA SPOC"];
 const GRID_MIN_ROWS = 4;
 
 const EXAMPLE_TICKET_ROWS = [
