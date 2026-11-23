@@ -1048,3 +1048,9 @@ body {
 .jira-import summary { cursor: pointer; font-weight: 600; }
 .jira-import ol { margin: 8px 0 0 18px; padding: 0; }
 .jira-import li { margin-bottom: 6px; }
+
+/* Grid cells the BA still has to fill */
+.excel-grid td.needs-input[contenteditable="true"] { background: #ffe0b2 !important; }
+.excel-grid td.needs-input[contenteditable="true"]:focus { background: #fff8e1 !important; }
+.grid-needs-input { margin-left: 12px; font-weight: 600; }
+.grid-needs-input.is-warn { color: #b25e00; }

@@ -234,9 +234,12 @@ function jiraFetchBookmarklet(appUrl) {
     alert("Open a Jira page (https://odessainc.atlassian.net/...) first, then click this bookmark there.\nYou are on: " + location.origin);
     return;
   }
-  var jql = new URLSearchParams(location.search).get("jql") || "";
+  var lastJql = "";
+  try { lastJql = localStorage.getItem("frng_last_jql") || ""; } catch (e) {}
+  var jql = new URLSearchParams(location.search).get("jql") || lastJql;
   jql = prompt("JQL query to import into Release Notes Generator:", jql);
   if (!jql || !jql.trim()) return;
+  try { localStorage.setItem("frng_last_jql", jql); } catch (e) {}
   var appWin = null;
   try { appWin = window.open(appUrl, "_blank"); } catch (e) { appWin = null; }
   var rows = [];
@@ -666,9 +669,48 @@ function sortAllSectionsByPriority() {
   Object.keys(SECTION_CONFIG).forEach(sortSectionByPriority);
 }
 
+// Marks grid cells the BA still has to fill and shows a count. Required, per
+// row that has any content: Applies To, plus (for sections other than
+// Business Configuration, which has no TSR/priority) Priority, # Test Cases
+// and # Passed. # Failed is not flagged because blank usually means 0.
+function refreshGridNeedsInput() {
+  const body = document.getElementById("pasteGridBody");
+  const msg = document.getElementById("gridNeedsInput");
+  if (!body) return;
+  let count = 0;
+  let rowsWithData = 0;
+  Array.from(body.children).forEach(tr => {
+    const cells = {};
+    GRID_COLUMNS.forEach(col => { cells[col] = tr.querySelector(`td[data-col="${col}"]`); });
+    const val = col => (cells[col].textContent || "").trim();
+    const hasData = GRID_COLUMNS.some(col => val(col) !== "");
+    const need = {};
+    if (hasData) {
+      rowsWithData++;
+      const section = decideSection(val("issueType"), val("subType"), val("targetSection"));
+      need.sites = val("sites") === "";
+      if (section !== "bizconfig") {
+        need.priority = val("priority") === "";
+        need.numTestCases = val("numTestCases") === "";
+        need.testCasesPassed = val("testCasesPassed") === "";
+      }
+    }
+    GRID_COLUMNS.forEach(col => {
+      const flag = !!need[col];
+      cells[col].classList.toggle("needs-input", flag);
+      if (flag) count++;
+    });
+  });
+  if (msg) {
+    msg.textContent = rowsWithData === 0 ? "" : (count === 0 ? "All required cells filled" : `${count} cell${count === 1 ? "" : "s"} need input (highlighted)`);
+    msg.classList.toggle("is-warn", count > 0);
+  }
+}
+
 function scheduleFormChangeHandlers() {
   clearTimeout(formChangeTimer);
   formChangeTimer = setTimeout(() => {
+    refreshGridNeedsInput();
     sortAllSectionsByPriority();
     updateAllSectionCollapseStates();
     renderSummary();
